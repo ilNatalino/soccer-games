@@ -5,6 +5,7 @@ import { evaluateGuess } from './wordle'
 import './style.css'
 
 const maxAttempts = 6
+const progressKey = `missing-xi:${derby.playedOn}:${derby.away}:v1`
 const endedEarly = ref(false)
 const lineup = reactive(derby.lineup.map(({ role, players }) => ({
   role,
@@ -32,7 +33,8 @@ const finished = computed(() => remaining.value === 0)
 const guessedCount = computed(() => shirts.filter(shirt => shirt.outcome === 'Indovinato').length)
 const totalAttempts = computed(() => shirts.reduce((total, shirt) => total + shirt.attempts.length, 0))
 
-const selected = ref<Shirt | null>(null)
+let lastSnapshot: string | null = null
+const selected = ref<Shirt | null>(restoreProgress() ?? null)
 const guessInput = useTemplateRef<HTMLInputElement>('guessInput')
 const resultMessage = useTemplateRef<HTMLParagraphElement>('resultMessage')
 const finishDialog = useTemplateRef<HTMLDialogElement>('finishDialog')
@@ -60,6 +62,49 @@ function letters(text: string) {
   return text.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/[^A-Z]/g, '')
 }
 
+function restoreProgress() {
+  try {
+    const snapshot = localStorage.getItem(progressKey)
+    if (snapshot === null || snapshot === lastSnapshot) return
+    const saved: unknown = JSON.parse(snapshot)
+    if (!saved || typeof saved !== 'object' || !('attempts' in saved)) return
+    if (!('endedEarly' in saved) || typeof saved.endedEarly !== 'boolean') return
+    const byNumber = saved.attempts
+    if (!byNumber || typeof byNumber !== 'object' || Array.isArray(byNumber)) return
+
+    const restored = shirts.map(shirt => {
+      const guesses = (byNumber as Record<number, unknown>)[shirt.number]
+      if (!Array.isArray(guesses) || guesses.length > maxAttempts) return
+      if (guesses.every((guess: unknown, index): guess is string => typeof guess === 'string'
+        && guess.length === shirt.answer.length && letters(guess) === guess
+        && (guess !== shirt.answer || index === guesses.length - 1))) return { shirt, guesses }
+    })
+    if (!restored.every(entry => entry !== undefined)) return
+
+    for (const { shirt, guesses } of restored) shirt.attempts = guesses
+    endedEarly.value = saved.endedEarly
+    lastSnapshot = snapshot
+    if ('selectedNumber' in saved) return shirts.find(shirt => shirt.number === saved.selectedNumber)
+  } catch {
+    // Unavailable storage or an unreadable save should still let the page open.
+  }
+}
+
+function saveProgress() {
+  try {
+    const snapshot = JSON.stringify({
+      endedEarly: endedEarly.value,
+      selectedNumber: selected.value?.number ?? null,
+      attempts: Object.fromEntries(shirts.map(shirt => [shirt.number, shirt.attempts])),
+    })
+    // shortcut: tabs can race between read and write, use transactional storage if supporting simultaneous play.
+    localStorage.setItem(progressKey, snapshot)
+    lastSnapshot = snapshot
+  } catch {
+    // Let the current game continue if the browser blocks storage or runs out of space.
+  }
+}
+
 function editGuess(event: Event) {
   const shirt = selected.value
   if (!shirt) return
@@ -78,10 +123,13 @@ async function focusGame() {
 }
 
 function submitGuess() {
+  restoreProgress()
   const shirt = selected.value
+  if (finished.value || shirt?.outcome) return focusGame()
   if (!shirt || !canSubmit.value) return
   shirt.attempts.push(shirt.draft)
   shirt.draft = ''
+  saveProgress()
   return focusGame()
 }
 
@@ -98,7 +146,11 @@ function openFinishDialog(event: MouseEvent) {
 
 function finishEarly() {
   finishDialog.value?.close()
-  endedEarly.value = true
+  restoreProgress()
+  if (!finished.value) {
+    endedEarly.value = true
+    saveProgress()
+  }
   return focusGame()
 }
 </script>

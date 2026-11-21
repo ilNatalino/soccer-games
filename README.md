@@ -15,7 +15,9 @@ Apri l’indirizzo `Local` stampato nel terminale sul PC. Sul telefono, collegat
 
 Scegli una delle undici maglie e scrivi le lettere indicate dalla griglia. Gli spazi dei nomi composti sono già al loro posto. Ogni maglia ha sei tentativi e puoi cambiare titolare e ritrovare le righe già inviate. La risposta corretta o il sesto errore chiude la maglia e mostra il nome del titolare.
 
-Quando tutte le maglie sono chiuse, il campo mostra i titolari indovinati e rivelati e il totale dei tentativi inviati. Puoi anche scegliere «Concludi» per rivelare i titolari rimasti e vedere il risultato. Per ora ricaricare la pagina azzera la sfida.
+Quando tutte le maglie sono chiuse, il campo mostra i titolari indovinati e rivelati e il totale dei tentativi inviati. Puoi anche scegliere «Concludi» per rivelare i titolari rimasti e vedere il risultato.
+
+Riaprendo lo stesso indirizzo nello stesso browser ritrovi i tentativi inviati o, a sfida conclusa, il risultato definitivo. Ogni browser conserva i propri progressi.
 
 ## Verifiche
 

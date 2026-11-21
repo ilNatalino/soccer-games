@@ -179,6 +179,44 @@ async function playShirt(page: Page, number: number, guesses: string[]) {
   }
 }
 
+test('ricaricare ripristina la maglia in corso, gli indizi e gli esiti delle altre maglie', async ({ page }) => {
+  await page.goto('/')
+  await playShirt(page, 13, ['MAICON'])
+  await playShirt(page, 6, Array<string>(6).fill('ZZZZZ'))
+  await playShirt(page, 9, ['OTTO'])
+  await page.reload()
+
+  await expect(page.getByRole('heading', { name: 'Maglia 9' })).toBeVisible()
+  const first = page.getByRole('group', { name: 'Tentativo 1', exact: true })
+  for (const [index, label] of ['O: presente altrove', 'T: posizione corretta', 'T: assente', 'O: posizione corretta'].entries()) {
+    await expect(first.getByRole('img').nth(index)).toHaveAccessibleName(label)
+  }
+  await expect(page.getByRole('status')).toHaveText('1 di 6 tentativi inviati')
+  await expect(page.getByRole('button', { name: 'Maglia 13, Maicon, Indovinato' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Maglia 6, Lúcio, Rivelato' })).toBeVisible()
+
+  await playShirt(page, 9, ['ETOO'])
+  await expect(page.getByRole('status')).toContainText('2 di 6 tentativi inviati')
+})
+
+test('due browser allo stesso indirizzo ritrovano ciascuno i propri tentativi', async ({ browser, page }) => {
+  const other = await browser.newPage()
+  try {
+    await page.goto('/')
+    await playShirt(page, 9, ['OTTO'])
+    await other.goto(page.url())
+    await expect(other.getByRole('heading', { name: 'Chi era in campo?' })).toBeVisible()
+    await playShirt(other, 9, ['ETOO'])
+
+    await page.reload()
+    await other.reload()
+    await expect(page.getByRole('status')).toHaveText('1 di 6 tentativi inviati')
+    await expect(other.getByRole('status')).toContainText('Eto’o · Indovinato')
+  } finally {
+    await other.close()
+  }
+})
+
 test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato porta al risultato', async ({ page, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 320, height: 640 })
   await page.goto('/')
@@ -225,7 +263,7 @@ test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato por
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
-test('annullare Concludi conserva i tentativi e confermare rivela i quattro titolari rimasti', async ({ page, isMobile }) => {
+test('annullare Concludi conserva i tentativi e confermare salva il risultato con i quattro titolari rivelati', async ({ page, context, isMobile }) => {
   await page.goto('/')
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
   const submit = page.getByRole('button', { name: 'Invia tentativo' })
@@ -267,9 +305,18 @@ test('annullare Concludi conserva i tentativi e confermare rivela i quattro tito
   for (const { name } of starters) await expect(page.getByText(name, { exact: true })).toBeVisible()
   await expect(input).toHaveCount(0)
   await expect(conclude).toHaveCount(0)
+
+  await page.close()
+  const reopened = await context.newPage()
+  await reopened.goto('/')
+  await expect(reopened.getByRole('heading', { name: 'Sfida conclusa' })).toBeVisible()
+  await expect(reopened.getByText('7 su 11 indovinati · 20 tentativi', { exact: true })).toBeVisible()
+  await expect(reopened.getByText('Indovinato', { exact: true })).toHaveCount(7)
+  await expect(reopened.getByText('Rivelato', { exact: true })).toHaveCount(4)
+  await expect(reopened.getByRole('button')).toHaveCount(0)
 })
 
-test('il sesto errore sull’ultima maglia conclude automaticamente la sfida', async ({ page }) => {
+test('il sesto errore sull’ultima maglia conclude la sfida e il risultato resta dopo la ricarica', async ({ page }) => {
   await page.goto('/')
   for (const { number, answer } of starters.slice(0, -1)) {
     await playShirt(page, number, [answer])
@@ -289,4 +336,29 @@ test('il sesto errore sull’ultima maglia conclude automaticamente la sfida', a
   await expect(page.getByText('10 su 11 indovinati · 16 tentativi', { exact: true })).toBeVisible()
   await expect(page.getByText('Indovinato', { exact: true })).toHaveCount(10)
   await expect(page.getByText('Rivelato', { exact: true })).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Sfida conclusa' })).toBeVisible()
+  await expect(page.getByText('10 su 11 indovinati · 16 tentativi', { exact: true })).toBeVisible()
+  await expect(page.getByText('Indovinato', { exact: true })).toHaveCount(10)
+  await expect(page.getByText('Rivelato', { exact: true })).toBeVisible()
+  await expect(page.getByRole('button')).toHaveCount(0)
+})
+
+test('una scheda già aperta mostra l’esito salvato della maglia o della sfida', async ({ context, page }) => {
+  await page.goto('/')
+  const other = await context.newPage()
+  await other.goto('/')
+  await playShirt(page, 9, ['ETOO'])
+  await playShirt(other, 9, ['OTTO'])
+  await expect(other.getByText('Eto’o · Indovinato', { exact: true })).toBeFocused()
+
+  await page.getByRole('button', { name: 'Concludi', exact: true }).click()
+  await page.getByRole('button', { name: 'Rivela e concludi' }).click()
+
+  await playShirt(other, 22, ['MILITO'])
+  await expect(other.getByRole('heading', { name: 'Sfida conclusa' })).toBeFocused()
+  await expect(other.getByText('1 su 11 indovinati · 1 tentativo', { exact: true })).toBeVisible()
+  await other.reload()
+  await expect(other.getByText('1 su 11 indovinati · 1 tentativo', { exact: true })).toBeVisible()
 })
