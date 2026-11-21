@@ -5,6 +5,7 @@ import { evaluateGuess } from './wordle'
 import './style.css'
 
 const maxAttempts = 6
+const endedEarly = ref(false)
 const lineup = reactive(derby.lineup.map(({ role, players }) => ({
   role,
   players: players.map(player => {
@@ -18,16 +19,24 @@ const lineup = reactive(derby.lineup.map(({ role, players }) => ({
       attempts: [] as string[],
       get outcome(): 'Indovinato' | 'Rivelato' | '' {
         if (this.attempts.includes(this.answer)) return 'Indovinato'
-        return this.attempts.length === maxAttempts ? 'Rivelato' : ''
+        return endedEarly.value || this.attempts.length === maxAttempts ? 'Rivelato' : ''
       },
     }
   }),
 })))
 type Shirt = (typeof lineup)[number]['players'][number]
 
+const shirts = lineup.flatMap(line => line.players)
+const remaining = computed(() => shirts.filter(shirt => !shirt.outcome).length)
+const finished = computed(() => remaining.value === 0)
+const guessedCount = computed(() => shirts.filter(shirt => shirt.outcome === 'Indovinato').length)
+const totalAttempts = computed(() => shirts.reduce((total, shirt) => total + shirt.attempts.length, 0))
+
 const selected = ref<Shirt | null>(null)
 const guessInput = useTemplateRef<HTMLInputElement>('guessInput')
 const resultMessage = useTemplateRef<HTMLParagraphElement>('resultMessage')
+const finishDialog = useTemplateRef<HTMLDialogElement>('finishDialog')
+const scoreHeading = useTemplateRef<HTMLHeadingElement>('scoreHeading')
 const rows = computed(() => {
   const shirt = selected.value
   if (!shirt) return []
@@ -61,9 +70,10 @@ function editGuess(event: Event) {
   input.setSelectionRange(cursor, cursor)
 }
 
-async function focusGuess() {
+async function focusGame() {
   await nextTick()
-  if (selected.value?.outcome) resultMessage.value?.focus()
+  if (finished.value) scoreHeading.value?.focus()
+  else if (selected.value?.outcome) resultMessage.value?.focus()
   else guessInput.value?.focus()
 }
 
@@ -72,12 +82,24 @@ function submitGuess() {
   if (!shirt || !canSubmit.value) return
   shirt.attempts.push(shirt.draft)
   shirt.draft = ''
-  return focusGuess()
+  return focusGame()
 }
 
 function selectShirt(shirt: Shirt) {
   selected.value = shirt
-  return focusGuess()
+  return focusGame()
+}
+
+function openFinishDialog(event: MouseEvent) {
+  const trigger = event.currentTarget as HTMLButtonElement
+  trigger.focus()
+  finishDialog.value?.showModal()
+}
+
+function finishEarly() {
+  finishDialog.value?.close()
+  endedEarly.value = true
+  return focusGame()
 }
 </script>
 
@@ -95,8 +117,12 @@ function selectShirt(shirt: Shirt) {
       <p>Una notte da ricordare. Ma ricordi chi era in campo?</p>
     </section>
 
-    <div class="game-layout">
+    <div class="game-layout" :class="{ finished }">
       <section class="formation" aria-labelledby="formation-title">
+        <div v-if="finished" class="challenge-result">
+          <h2 ref="scoreHeading" tabindex="-1" aria-describedby="challenge-score">Sfida conclusa</h2>
+          <p id="challenge-score">{{ guessedCount }} su {{ shirts.length }} indovinati · {{ totalAttempts }} {{ totalAttempts === 1 ? 'tentativo' : 'tentativi' }}</p>
+        </div>
         <div class="section-heading">
           <h2 id="formation-title">La formazione dell’Inter</h2>
           <span>{{ derby.formation }}</span>
@@ -104,27 +130,31 @@ function selectShirt(shirt: Shirt) {
         <div class="pitch">
           <div class="pitch-markings" aria-hidden="true"><i></i></div>
           <div v-for="line in lineup" :key="line.role" class="pitch-row">
-            <button
+            <component
               v-for="player in line.players"
               :key="player.number"
-              type="button"
+              :is="finished ? 'div' : 'button'"
+              :type="finished ? undefined : 'button'"
               class="player"
-              :class="{ selected: selected === player, resolved: player.outcome }"
-              :aria-label="player.outcome ? `Maglia ${player.number}, ${player.name}, ${player.outcome}` : `Maglia ${player.number}, ${line.role}`"
-              :aria-pressed="selected === player"
-              aria-controls="guess-panel"
-              @click="selectShirt(player)"
+              :class="{ selected: !finished && selected === player, resolved: player.outcome }"
+              :aria-label="finished ? undefined : (player.outcome ? `Maglia ${player.number}, ${player.name}, ${player.outcome}` : `Maglia ${player.number}, ${line.role}`)"
+              :aria-pressed="finished ? undefined : selected === player"
+              :aria-controls="finished ? undefined : 'guess-panel'"
+              @click="!finished && selectShirt(player)"
             >
-              <span class="shirt" :class="{ goalkeeper: line.role === 'portiere' }" aria-hidden="true">{{ player.number }}</span>
+              <span class="shirt" :class="{ goalkeeper: line.role === 'portiere' }" :aria-hidden="!finished">{{ player.number }}</span>
               <span class="player-caption">{{ player.outcome ? player.name : '· · ·' }}</span>
               <span v-if="player.outcome" class="player-outcome">{{ player.outcome }}</span>
-            </button>
+            </component>
           </div>
         </div>
-        <p class="pitch-caption">Scegli una maglia. Hai sei tentativi per ogni titolare.</p>
+        <template v-if="!finished">
+          <p class="pitch-caption">Scegli una maglia. Hai sei tentativi per ogni titolare.</p>
+          <button type="button" class="secondary conclude" aria-haspopup="dialog" @click="openFinishDialog">Concludi</button>
+        </template>
       </section>
 
-      <section id="guess-panel" class="guess-panel" aria-labelledby="guess-title">
+      <section v-if="!finished" id="guess-panel" class="guess-panel" aria-labelledby="guess-title">
         <p class="eyebrow">Tocca a te</p>
         <h2 id="guess-title">{{ selected ? `Maglia ${selected.number}` : 'Chi era in campo?' }}</h2>
         <template v-if="selected">
@@ -165,6 +195,13 @@ function selectShirt(shirt: Shirt) {
         <p v-else class="intro">Seleziona la maglia sul campo e scrivi il nome. Ogni lettera è un indizio.</p>
       </section>
     </div>
+    <dialog v-if="!finished" ref="finishDialog" class="finish-dialog" aria-labelledby="finish-title">
+      <h2 id="finish-title">{{ remaining === 1 ? 'Vuoi rivelare 1 titolare rimasto?' : `Vuoi rivelare i ${remaining} titolari rimasti?` }}</h2>
+      <form method="dialog">
+        <button class="secondary" autofocus>Continua a giocare</button>
+        <button type="button" class="submit" @click="finishEarly">Rivela e concludi</button>
+      </form>
+    </dialog>
     <footer>Missing XI · Una formazione, undici ricordi.</footer>
   </main>
 </template>

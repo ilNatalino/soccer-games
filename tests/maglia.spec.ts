@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 
 test('il derby mostra undici maglie e permette di aprire la numero 9', async ({ page, isMobile }) => {
   await page.goto('/')
@@ -157,22 +157,31 @@ test('cambiare maglia conserva i tentativi e il feedback del titolare precedente
   await expect(page.getByRole('button', { name: 'Maglia 13, Maicon, Indovinato' })).toBeVisible()
 })
 
-test('ogni titolare ha sei righe e i nomi composti hanno uno spazio fisso', async ({ page, isMobile }) => {
+const starters = [
+  { number: 12, name: 'Júlio César', answer: 'JULIOCESAR', spaceAfter: 5 },
+  { number: 8, name: 'Thiago Motta', answer: 'THIAGOMOTTA', spaceAfter: 6 },
+  { number: 13, name: 'Maicon', answer: 'MAICON' },
+  { number: 6, name: 'Lúcio', answer: 'LUCIO' },
+  { number: 25, name: 'Samuel', answer: 'SAMUEL' },
+  { number: 26, name: 'Chivu', answer: 'CHIVU' },
+  { number: 4, name: 'Zanetti', answer: 'ZANETTI' },
+  { number: 5, name: 'Stanković', answer: 'STANKOVIC' },
+  { number: 10, name: 'Sneijder', answer: 'SNEIJDER' },
+  { number: 22, name: 'Milito', answer: 'MILITO' },
+  { number: 9, name: 'Eto’o', answer: 'ETOO' },
+]
+
+async function playShirt(page: Page, number: number, guesses: string[]) {
+  await page.getByRole('button', { name: new RegExp(`^Maglia ${number},`) }).click()
+  for (const guess of guesses) {
+    await page.getByRole('textbox', { name: 'Il tuo tentativo' }).fill(guess)
+    await page.getByRole('button', { name: 'Invia tentativo' }).click()
+  }
+}
+
+test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato porta al risultato', async ({ page, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 320, height: 640 })
   await page.goto('/')
-  const starters = [
-    { number: 12, name: 'Júlio César', answer: 'JULIOCESAR', spaceAfter: 5 },
-    { number: 8, name: 'Thiago Motta', answer: 'THIAGOMOTTA', spaceAfter: 6 },
-    { number: 13, name: 'Maicon', answer: 'MAICON' },
-    { number: 6, name: 'Lúcio', answer: 'LUCIO' },
-    { number: 25, name: 'Samuel', answer: 'SAMUEL' },
-    { number: 26, name: 'Chivu', answer: 'CHIVU' },
-    { number: 4, name: 'Zanetti', answer: 'ZANETTI' },
-    { number: 5, name: 'Stanković', answer: 'STANKOVIC' },
-    { number: 10, name: 'Sneijder', answer: 'SNEIJDER' },
-    { number: 22, name: 'Milito', answer: 'MILITO' },
-    { number: 9, name: 'Eto’o', answer: 'ETOO' },
-  ]
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
   const submit = page.getByRole('button', { name: 'Invia tentativo' })
   const rows = page.getByRole('group', { name: /^Tentativo \d+$/ })
@@ -195,6 +204,7 @@ test('ogni titolare ha sei righe e i nomi composti hanno uno spazio fisso', asyn
     if (spaceAfter) {
       await expect(first.getByRole('img').nth(spaceAfter + 1)).toHaveAccessibleName(answer[spaceAfter]!)
     }
+    if (number === 9) break
     if (isMobile) await submit.tap()
     else await input.press('Enter')
     await expect(first.getByRole('img', { name: /posizione corretta/ })).toHaveCount(answer.length)
@@ -202,4 +212,81 @@ test('ogni titolare ha sei righe e i nomi composti hanno uno spazio fisso', asyn
     await expect(shirt).toHaveAccessibleName(`Maglia ${number}, ${name}, Indovinato`)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   }
+
+  for (const guess of ['OOOO', 'OTTO', 'ETOO']) {
+    await input.fill(guess)
+    if (isMobile) await submit.tap()
+    else await input.press('Enter')
+  }
+  await expect(page.getByRole('heading', { name: 'Sfida conclusa' })).toBeFocused()
+  await expect(page.getByText('11 su 11 indovinati · 13 tentativi', { exact: true })).toBeVisible()
+  await expect(page.getByText('Indovinato', { exact: true })).toHaveCount(11)
+  await expect(page.getByRole('button', { name: /^Maglia / })).toHaveCount(0)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('annullare Concludi conserva i tentativi e confermare rivela i quattro titolari rimasti', async ({ page, isMobile }) => {
+  await page.goto('/')
+  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
+  const submit = page.getByRole('button', { name: 'Invia tentativo' })
+  const conclude = page.getByRole('button', { name: 'Concludi', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'Vuoi rivelare i 4 titolari rimasti?' })
+  const cancel = dialog.getByRole('button', { name: 'Continua a giocare' })
+  const confirm = dialog.getByRole('button', { name: 'Rivela e concludi' })
+
+  for (const { number, answer } of starters.slice(0, 7)) {
+    await playShirt(page, number, [answer])
+  }
+  await playShirt(page, 9, Array<string>(5).fill('ZZZZ'))
+  await playShirt(page, 22, Array<string>(5).fill('ZZZZZZ'))
+  await playShirt(page, 10, ['ZZZZZZZZ', 'ZZZZZZZZ'])
+
+  await expect(conclude).toBeVisible()
+  if (isMobile) await conclude.tap()
+  else await conclude.click()
+  await expect(dialog).toBeVisible()
+  await expect(cancel).toBeFocused()
+  if (isMobile) await cancel.tap()
+  else await page.keyboard.press('Enter')
+  await expect(dialog).toBeHidden()
+  await expect(conclude).toBeFocused()
+  await expect(page.getByRole('status')).toHaveText('2 di 6 tentativi inviati')
+  await expect(page.getByRole('group', { name: 'Tentativo 1', exact: true }).getByLabel('Z: assente').first()).toBeVisible()
+
+  await input.fill('ZZZZZZZZ')
+  await submit.click()
+  await conclude.click()
+  if (isMobile) await confirm.tap()
+  else await confirm.click()
+  await expect(dialog).toBeHidden()
+  await expect(page.getByRole('heading', { name: 'Sfida conclusa' })).toBeFocused()
+  await expect(page.getByText('7 su 11 indovinati · 20 tentativi', { exact: true })).toBeVisible()
+  await expect(page.getByText(/\btentativ[oi]\b/)).toHaveCount(1)
+  await expect(page.getByText('Indovinato', { exact: true })).toHaveCount(7)
+  await expect(page.getByText('Rivelato', { exact: true })).toHaveCount(4)
+  for (const { name } of starters) await expect(page.getByText(name, { exact: true })).toBeVisible()
+  await expect(input).toHaveCount(0)
+  await expect(conclude).toHaveCount(0)
+})
+
+test('il sesto errore sull’ultima maglia conclude automaticamente la sfida', async ({ page }) => {
+  await page.goto('/')
+  for (const { number, answer } of starters.slice(0, -1)) {
+    await playShirt(page, number, [answer])
+  }
+  await playShirt(page, 9, Array<string>(5).fill('ZZZZ'))
+  await expect(page.getByRole('status')).toHaveText('5 di 6 tentativi inviati')
+  const conclude = page.getByRole('button', { name: 'Concludi', exact: true })
+  const dialog = page.getByRole('dialog', { name: 'Vuoi rivelare 1 titolare rimasto?' })
+  await expect(page.getByRole('textbox', { name: 'Il tuo tentativo' })).toBeFocused()
+  await conclude.dispatchEvent('click')
+  await expect(dialog).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(dialog).toBeHidden()
+  await expect(conclude).toBeFocused()
+
+  await playShirt(page, 9, ['ZZZZ'])
+  await expect(page.getByText('10 su 11 indovinati · 16 tentativi', { exact: true })).toBeVisible()
+  await expect(page.getByText('Indovinato', { exact: true })).toHaveCount(10)
+  await expect(page.getByText('Rivelato', { exact: true })).toBeVisible()
 })
