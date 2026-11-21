@@ -93,7 +93,14 @@ for (const [lastGuess, outcome] of [['AAAA', 'Rivelato'], ['ETOO', 'Indovinato']
     await expect(page.getByRole('button', { name: `Maglia 9, Eto’o, ${outcome}` })).toBeVisible()
     await expect(input).toBeDisabled()
     await expect(submit).toBeDisabled()
-    await page.getByRole('button', { name: 'Maglia 22, attaccante', exact: true }).click()
+    const shirt22 = page.getByRole('button', { name: 'Maglia 22, attaccante', exact: true })
+    if (isMobile) await shirt22.tap()
+    else await shirt22.click()
+    await expect(input).toBeEnabled()
+    await input.fill('milito')
+    if (isMobile) await submit.tap()
+    else await input.press('Enter')
+    await expect(page.getByRole('status')).toContainText('Milito · Indovinato')
     await page.getByRole('button', { name: `Maglia 9, Eto’o, ${outcome}` }).click()
     await page.keyboard.press('Enter')
     await expect(page.getByRole('status')).toContainText('6 di 6 tentativi inviati')
@@ -112,4 +119,87 @@ test('l’input accetta solo lettere e normalizza maiuscole, accenti e apostrofo
   await expect(input).toHaveValue('ETOO')
   await input.press('Enter')
   await expect(page.getByRole('status')).toContainText('Eto’o · Indovinato')
+})
+
+test('cambiare maglia conserva i tentativi e il feedback del titolare precedente', async ({ page, isMobile }) => {
+  await page.goto('/')
+  const shirt22 = page.getByRole('button', { name: 'Maglia 22, attaccante', exact: true })
+  const shirt13 = page.getByRole('button', { name: 'Maglia 13, difensore', exact: true })
+  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
+  const submit = page.getByRole('button', { name: 'Invia tentativo' })
+  const first = page.getByRole('group', { name: 'Tentativo 1', exact: true })
+
+  if (isMobile) await shirt22.tap()
+  else await shirt22.click()
+  await expect(first.getByLabel('Casella vuota')).toHaveCount(6)
+  await input.fill('maicon')
+  if (isMobile) await submit.tap()
+  else await input.press('Enter')
+  await expect(page.getByRole('status')).toHaveText('1 di 6 tentativi inviati')
+  await expect(first.getByLabel('M: posizione corretta')).toBeVisible()
+  await expect(first.getByLabel('A: assente')).toBeVisible()
+
+  if (isMobile) await shirt13.tap()
+  else await shirt13.click()
+  await expect(page.getByRole('status')).toHaveText('0 di 6 tentativi inviati')
+  await expect(first.getByLabel('Casella vuota')).toHaveCount(6)
+  await input.fill('maicon')
+  if (isMobile) await submit.tap()
+  else await input.press('Enter')
+  await expect(page.getByRole('status')).toContainText('Maicon · Indovinato')
+
+  if (isMobile) await shirt22.tap()
+  else await shirt22.click()
+  await expect(page.getByRole('status')).toHaveText('1 di 6 tentativi inviati')
+  await expect(first.getByLabel('M: posizione corretta')).toBeVisible()
+  await expect(first.getByLabel('A: assente')).toBeVisible()
+  await expect(input).toBeEnabled()
+  await expect(page.getByRole('button', { name: 'Maglia 13, Maicon, Indovinato' })).toBeVisible()
+})
+
+test('ogni titolare ha sei righe e i nomi composti hanno uno spazio fisso', async ({ page, isMobile }) => {
+  if (isMobile) await page.setViewportSize({ width: 320, height: 640 })
+  await page.goto('/')
+  const starters = [
+    { number: 12, name: 'Júlio César', answer: 'JULIOCESAR', spaceAfter: 5 },
+    { number: 8, name: 'Thiago Motta', answer: 'THIAGOMOTTA', spaceAfter: 6 },
+    { number: 13, name: 'Maicon', answer: 'MAICON' },
+    { number: 6, name: 'Lúcio', answer: 'LUCIO' },
+    { number: 25, name: 'Samuel', answer: 'SAMUEL' },
+    { number: 26, name: 'Chivu', answer: 'CHIVU' },
+    { number: 4, name: 'Zanetti', answer: 'ZANETTI' },
+    { number: 5, name: 'Stanković', answer: 'STANKOVIC' },
+    { number: 10, name: 'Sneijder', answer: 'SNEIJDER' },
+    { number: 22, name: 'Milito', answer: 'MILITO' },
+    { number: 9, name: 'Eto’o', answer: 'ETOO' },
+  ]
+  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
+  const submit = page.getByRole('button', { name: 'Invia tentativo' })
+  const rows = page.getByRole('group', { name: /^Tentativo \d+$/ })
+  const first = rows.first()
+
+  for (const { number, name, answer, spaceAfter } of starters) {
+    const shirt = page.getByRole('button', { name: new RegExp(`^Maglia ${number},`) })
+    if (isMobile) await shirt.tap()
+    else await shirt.click()
+    await expect(shirt).toHaveAttribute('aria-pressed', 'true')
+    await expect(rows).toHaveCount(6)
+    await expect(first.getByRole('img', { name: 'Casella vuota' })).toHaveCount(answer.length)
+    if (spaceAfter) {
+      await expect(first.getByRole('img').nth(spaceAfter)).toHaveAccessibleName('Spazio')
+      await expect(rows.getByRole('img', { name: 'Spazio', exact: true })).toHaveCount(6)
+    }
+    await expect(page.getByRole('status')).toHaveText('0 di 6 tentativi inviati')
+    await input.fill(name)
+    await expect(input).toHaveValue(answer)
+    if (spaceAfter) {
+      await expect(first.getByRole('img').nth(spaceAfter + 1)).toHaveAccessibleName(answer[spaceAfter]!)
+    }
+    if (isMobile) await submit.tap()
+    else await input.press('Enter')
+    await expect(first.getByRole('img', { name: /posizione corretta/ })).toHaveCount(answer.length)
+    await expect(page.getByRole('status')).toContainText(`${name} · Indovinato`)
+    await expect(shirt).toHaveAccessibleName(`Maglia ${number}, ${name}, Indovinato`)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  }
 })

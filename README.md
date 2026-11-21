@@ -13,7 +13,7 @@ npm run dev
 
 Apri l’indirizzo `Local` stampato nel terminale sul PC. Sul telefono, collegato alla stessa rete Wi-Fi, apri l’indirizzo `Network`. Lascia il PC acceso e il comando in esecuzione; se il sistema chiede accesso alla rete locale, consentilo. Per fermare il server premi `Ctrl+C`.
 
-Il ticket 01 rende giocabile la maglia 9: selezionala, scrivi quattro lettere e invia. Le altre dieci maglie sono selezionabili ma non ancora giocabili. Dopo la risposta corretta o sei errori compare «Eto’o» e non si possono inviare altri tentativi per quella maglia. Per ora ricaricare la pagina azzera i tentativi: la persistenza appartiene al ticket 04.
+Scegli una delle undici maglie e scrivi le lettere indicate dalla griglia. Gli spazi dei nomi composti sono già al loro posto. Ogni maglia ha sei tentativi e puoi cambiare titolare e ritrovare le righe già inviate. La risposta corretta o il sesto errore chiude la maglia e mostra il nome del titolare. Per ora ricaricare la pagina azzera i tentativi.
 
 ## Verifiche
 

@@ -50,7 +50,7 @@ h1, h2, p { margin: 0; }
 .shirt { display: grid; place-items: center; width: 52px; height: 48px; background: repeating-linear-gradient(90deg, #151e2f 0 10px, #3777d6 10px 20px); clip-path: polygon(24% 0, 36% 0, 42% 9%, 58% 9%, 64% 0, 76% 0, 100% 20%, 85% 42%, 75% 34%, 75% 100%, 25% 100%, 25% 34%, 15% 42%, 0 20%); font-size: 1.1rem; font-weight: 800; text-shadow: 0 1px 3px #000; padding-top: 8px; }
 .shirt.goalkeeper { background: #d4a83a; color: #152235; text-shadow: none; }
 .player-caption { font-size: .875rem; line-height: 1.2; white-space: nowrap; }
-.playable .player-caption { font-weight: 700; }
+.resolved .player-caption { font-weight: 700; }
 .player-outcome { font-size: .75rem; }
 .pitch-caption { margin-top: 12px; color: #53647a; font-size: .875rem; }
 .guess-panel { background: white; border: 1px solid #dce2e9; border-radius: 8px; padding: 24px; }
@@ -58,8 +58,9 @@ h1, h2, p { margin: 0; }
 .muted { color: #53647a; font-size: .875rem; }
 .intro { margin-top: 18px; }
 .guess-grid { display: grid; gap: 6px; margin: 24px 0; }
-.guess-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.letter { position: relative; display: grid; place-items: center; height: 48px; border: 1px solid #d0d8e1; border-radius: 4px; font-size: 1.4rem; font-weight: 700; }
+.guess-row { display: flex; gap: 3px; }
+.word-space { flex: 0 0 6px; }
+.letter { flex: 1 1 0; min-width: 0; position: relative; display: grid; place-items: center; height: 48px; border: 1px solid #d0d8e1; border-radius: 4px; font-size: clamp(.875rem, 4vw, 1.125rem); font-weight: 700; }
 .letter small { position: absolute; bottom: 0; right: 4px; font-size: .75rem; }
 .correct { color: white; background: #28644d; border-color: #28644d; }
 .present { color: white; background: #8a6013; border-color: #8a6013; }
@@ -70,6 +71,7 @@ h1, h2, p { margin: 0; }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; padding: 16px 0 0; margin: 20px 0 0; border-top: 1px solid #dce2e9; font-size: .875rem; }
 .legend li { display: flex; align-items: center; gap: 6px; }
 .legend span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 3px; }
+.guess-panel form { margin-top: 16px; }
 form label { display: block; font-size: .875rem; font-weight: 600; margin-bottom: 6px; }
 input { width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid #8898ac; border-radius: 4px; font-size: 1.125rem; letter-spacing: .2em; text-transform: uppercase; }
 .submit { width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 4px; color: white; background: #234e9d; font-weight: 600; }

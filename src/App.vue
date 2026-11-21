@@ -1,49 +1,83 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
-import { derby, etoo } from './derby'
+import { computed, nextTick, reactive, ref, useTemplateRef } from 'vue'
+import { derby } from './derby'
 import { evaluateGuess } from './wordle'
 import './style.css'
 
-// shortcut: si gioca solo la maglia 9; collegare le altre con il ticket 02.
-const selected = ref<number | null>(null)
+const maxAttempts = 6
+const lineup = reactive(derby.lineup.map(({ role, players }) => ({
+  role,
+  players: players.map(player => {
+    const pattern = player.name.split(' ').map(letters).join(' ')
+    return {
+      ...player,
+      role,
+      pattern,
+      answer: pattern.replaceAll(' ', ''),
+      draft: '',
+      attempts: [] as string[],
+      get outcome(): 'Indovinato' | 'Rivelato' | '' {
+        if (this.attempts.includes(this.answer)) return 'Indovinato'
+        return this.attempts.length === maxAttempts ? 'Rivelato' : ''
+      },
+    }
+  }),
+})))
+type Shirt = (typeof lineup)[number]['players'][number]
+
+const selected = ref<Shirt | null>(null)
 const guessInput = useTemplateRef<HTMLInputElement>('guessInput')
 const resultMessage = useTemplateRef<HTMLParagraphElement>('resultMessage')
-const guess = ref('')
-const attempts = ref<string[]>([])
-const outcome = computed(() => {
-  if (attempts.value.includes(etoo.answer)) return 'Indovinato'
-  return attempts.value.length >= 6 ? 'Rivelato' : ''
+const rows = computed(() => {
+  const shirt = selected.value
+  if (!shirt) return []
+  let letterIndex = 0
+  const positions = Array.from(shirt.pattern, character => character === ' ' ? null : letterIndex++)
+  return Array.from({ length: maxAttempts }, (_, row) => {
+    const attempt = shirt.attempts[row]
+    const feedback = attempt ? evaluateGuess(shirt.answer, attempt) : []
+    const text = attempt ?? (row === shirt.attempts.length ? shirt.draft : '')
+    return positions.map(cell => cell === null ? null : { letter: text[cell], feedback: feedback[cell] })
+  })
 })
-const feedback = computed(() => attempts.value.map(attempt => evaluateGuess(etoo.answer, attempt)))
-const canSubmit = computed(() => selected.value === etoo.number && !outcome.value && /^[A-Z]{4}$/.test(guess.value))
+const canSubmit = computed(() => {
+  const shirt = selected.value
+  return Boolean(shirt && !shirt.outcome && shirt.draft.length === shirt.answer.length)
+})
 const feedbackLabels = { correct: 'posizione corretta', present: 'presente altrove', absent: 'assente' }
 const feedbackSymbols = { correct: '✓', present: '↔', absent: '×' }
 
+function letters(text: string) {
+  return text.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/[^A-Z]/g, '')
+}
+
 function editGuess(event: Event) {
+  const shirt = selected.value
+  if (!shirt) return
   const input = event.target as HTMLInputElement
-  const letters = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/[^A-Z]/g, '')
   const cursor = letters(input.value.slice(0, input.selectionStart ?? input.value.length)).length
-  guess.value = letters(input.value).slice(0, etoo.answer.length)
-  input.value = guess.value
+  shirt.draft = letters(input.value).slice(0, shirt.answer.length)
+  input.value = shirt.draft
   input.setSelectionRange(cursor, cursor)
 }
 
-async function submitGuess() {
-  if (!canSubmit.value) return
-  attempts.value.push(guess.value)
-  guess.value = ''
+async function focusGuess() {
   await nextTick()
-  if (outcome.value) resultMessage.value?.focus()
+  if (selected.value?.outcome) resultMessage.value?.focus()
   else guessInput.value?.focus()
 }
 
-async function selectShirt(number: number) {
-  selected.value = number
-  if (number === 9) {
-    await nextTick()
-    if (outcome.value) resultMessage.value?.focus()
-    else guessInput.value?.focus()
-  }
+function submitGuess() {
+  const shirt = selected.value
+  if (!shirt || !canSubmit.value) return
+  shirt.attempts.push(shirt.draft)
+  shirt.draft = ''
+  return focusGuess()
+}
+
+function selectShirt(shirt: Shirt) {
+  selected.value = shirt
+  return focusGuess()
 }
 </script>
 
@@ -69,66 +103,66 @@ async function selectShirt(number: number) {
         </div>
         <div class="pitch">
           <div class="pitch-markings" aria-hidden="true"><i></i></div>
-          <div v-for="line in derby.lineup" :key="line.role" class="pitch-row">
+          <div v-for="line in lineup" :key="line.role" class="pitch-row">
             <button
               v-for="player in line.players"
               :key="player.number"
               type="button"
               class="player"
-              :class="{ selected: selected === player.number, playable: player.number === 9 }"
-              :aria-label="player.number === etoo.number && outcome ? `Maglia ${player.number}, ${etoo.name}, ${outcome}` : `Maglia ${player.number}, ${line.role}`"
-              :aria-pressed="selected === player.number"
+              :class="{ selected: selected === player, resolved: player.outcome }"
+              :aria-label="player.outcome ? `Maglia ${player.number}, ${player.name}, ${player.outcome}` : `Maglia ${player.number}, ${line.role}`"
+              :aria-pressed="selected === player"
               aria-controls="guess-panel"
-              @click="selectShirt(player.number)"
+              @click="selectShirt(player)"
             >
               <span class="shirt" :class="{ goalkeeper: line.role === 'portiere' }" aria-hidden="true">{{ player.number }}</span>
-              <span class="player-caption">{{ player.number === etoo.number ? (outcome ? etoo.name : 'Gioca qui') : '· · ·' }}</span>
-              <span v-if="player.number === etoo.number && outcome" class="player-outcome">{{ outcome }}</span>
+              <span class="player-caption">{{ player.outcome ? player.name : '· · ·' }}</span>
+              <span v-if="player.outcome" class="player-outcome">{{ player.outcome }}</span>
             </button>
           </div>
         </div>
-        <p class="pitch-caption">Inizia dalla maglia 9. Hai sei tentativi per ricordare il titolare.</p>
+        <p class="pitch-caption">Scegli una maglia. Hai sei tentativi per ogni titolare.</p>
       </section>
 
       <section id="guess-panel" class="guess-panel" aria-labelledby="guess-title">
         <p class="eyebrow">Tocca a te</p>
-        <h2 id="guess-title">{{ selected === null ? 'Chi indossava la 9?' : `Maglia ${selected}` }}</h2>
-        <template v-if="selected === 9">
-          <p class="muted">Attaccante · 4 lettere</p>
+        <h2 id="guess-title">{{ selected ? `Maglia ${selected.number}` : 'Chi era in campo?' }}</h2>
+        <template v-if="selected">
+          <p class="muted">{{ selected.role }} · {{ selected.answer.length }} lettere</p>
+          <form @submit.prevent="submitGuess">
+            <label for="guess">Il tuo tentativo</label>
+            <input id="guess" ref="guessInput" :value="selected.draft" :disabled="Boolean(selected.outcome)" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocapitalize="characters" :spellcheck="false" aria-describedby="guess-hint" @input="editGuess" />
+            <p id="guess-hint" class="input-hint">Inserisci solo le lettere. Anche un nome inventato va bene.</p>
+            <button class="submit" :disabled="!canSubmit">Invia tentativo</button>
+          </form>
           <div class="guess-grid">
-            <div v-for="row in 6" :key="row" class="guess-row" role="group" :aria-label="`Tentativo ${row}`">
-              <span
-                v-for="cell in 4"
-                :key="cell"
-                class="letter"
-                :class="feedback[row - 1]?.[cell - 1]"
-                role="img"
-                :aria-label="attempts[row - 1]
-                  ? `${attempts[row - 1]![cell - 1]}: ${feedbackLabels[feedback[row - 1]![cell - 1]!]}`
-                  : 'Casella vuota'"
-              >
-                {{ attempts[row - 1]?.[cell - 1] }}
-                <small v-if="feedback[row - 1]" aria-hidden="true">{{ feedbackSymbols[feedback[row - 1]![cell - 1]!] }}</small>
-              </span>
+            <div v-for="(row, index) in rows" :key="index" class="guess-row" role="group" :aria-label="`Tentativo ${index + 1}`">
+              <template v-for="(cell, position) in row" :key="position">
+                <span v-if="cell === null" class="word-space" role="img" aria-label="Spazio"></span>
+                <span
+                  v-else
+                  class="letter"
+                  :class="cell.feedback"
+                  role="img"
+                  :aria-label="cell.feedback ? `${cell.letter}: ${feedbackLabels[cell.feedback]}` : (cell.letter ?? 'Casella vuota')"
+                >
+                  {{ cell.letter }}
+                  <small v-if="cell.feedback" aria-hidden="true">{{ feedbackSymbols[cell.feedback] }}</small>
+                </span>
+              </template>
             </div>
           </div>
           <div role="status" aria-atomic="true">
-            <p v-if="outcome" ref="resultMessage" class="result" tabindex="-1">{{ etoo.name }} · {{ outcome }}</p>
-            <p class="attempt-count">{{ attempts.length }} di 6 tentativi inviati</p>
+            <p v-if="selected.outcome" ref="resultMessage" class="result" tabindex="-1">{{ selected.name }} · {{ selected.outcome }}</p>
+            <p class="attempt-count">{{ selected.attempts.length }} di {{ maxAttempts }} tentativi inviati</p>
           </div>
-          <form @submit.prevent="submitGuess">
-            <label for="guess">Il tuo tentativo</label>
-            <input id="guess" ref="guessInput" :value="guess" :disabled="Boolean(outcome)" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocapitalize="characters" :spellcheck="false" aria-describedby="guess-hint" @input="editGuess" />
-            <p id="guess-hint" class="input-hint">Quattro lettere, senza apostrofo. Anche un nome inventato va bene.</p>
-            <button class="submit" :disabled="!canSubmit">Invia tentativo</button>
-          </form>
           <ul class="legend" aria-label="Significato degli indizi">
             <li><span class="correct" aria-hidden="true">✓</span> Posizione corretta</li>
             <li><span class="present" aria-hidden="true">↔</span> Presente altrove</li>
             <li><span class="absent" aria-hidden="true">×</span> Assente</li>
           </ul>
         </template>
-        <p v-else class="intro">{{ selected === null ? 'Seleziona la maglia sul campo e scrivi il nome. Ogni lettera è un indizio.' : 'Per questa prima prova è giocabile la maglia 9. Selezionala sul campo.' }}</p>
+        <p v-else class="intro">Seleziona la maglia sul campo e scrivi il nome. Ogni lettera è un indizio.</p>
       </section>
     </div>
     <footer>Missing XI · Una formazione, undici ricordi.</footer>
