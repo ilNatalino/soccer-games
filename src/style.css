@@ -1,0 +1,89 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: #172333;
+  background: #f4f6f8;
+  font-synthesis: none;
+  line-height: 1.5;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid #245fd2; outline-offset: 4px; }
+.masthead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px max(24px, calc((100% - 1080px) / 2));
+  color: white;
+  background: #112238;
+}
+.wordmark { text-decoration: none; font-weight: 800; letter-spacing: -.04em; font-size: 1.5rem; }
+.wordmark b { color: #8fb7ff; }
+.masthead > span { color: #c1cddd; font-size: .875rem; }
+main { max-width: 1128px; margin: auto; padding: 36px 24px 20px; }
+h1, h2, p { margin: 0; }
+.eyebrow { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #53647a; }
+.match h1 { margin: 8px 0; font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -.045em; line-height: 1.2; }
+.match h1 strong { display: inline-block; margin: 0 .2em; padding: 0 .25em; background: #112238; color: white; border-radius: 4px; font-variant-numeric: tabular-nums; }
+.match time { color: #53647a; font-size: .875rem; }
+.match > p:last-child { margin-top: 12px; }
+.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 36px; margin-top: 32px; align-items: start; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.section-heading h2 { font-size: 1rem; }
+.section-heading > span { color: #53647a; font-size: .875rem; font-variant-numeric: tabular-nums; }
+.pitch { position: relative; display: grid; grid-template-rows: repeat(5, 1fr); gap: 8px; padding: 20px 12px; min-height: 510px; background: repeating-linear-gradient(0deg, #245e49 0 10%, #28664f 10% 20%); border-radius: 8px; overflow: hidden; }
+.pitch-markings { position: absolute; inset: 14px; border: 1px solid #ffffff59; pointer-events: none; }
+.pitch-markings::before, .pitch-markings::after { content: ''; position: absolute; width: 48%; height: 14%; left: 26%; border: 1px solid #ffffff59; }
+.pitch-markings::before { top: -1px; }
+.pitch-markings::after { bottom: -1px; }
+.pitch-markings i { position: absolute; top: 50%; width: 100%; border-top: 1px solid #ffffff59; }
+.pitch-markings i::after { content: ''; position: absolute; width: 92px; height: 92px; border: 1px solid #ffffff59; border-radius: 50%; left: 50%; top: 0; transform: translate(-50%, -50%); }
+.pitch-row { display: flex; align-items: center; justify-content: space-evenly; z-index: 1; }
+.player { display: flex; flex-direction: column; align-items: center; gap: 4px; color: white; border: 2px solid transparent; background: transparent; padding: 4px 8px; border-radius: 6px; min-width: 64px; min-height: 78px; }
+.player:hover { background: #ffffff18; }
+.player:focus-visible { outline-color: #fff; }
+.player.selected { border-color: #c9e1ff; background: #10233c55; }
+.shirt { display: grid; place-items: center; width: 52px; height: 48px; background: repeating-linear-gradient(90deg, #151e2f 0 10px, #3777d6 10px 20px); clip-path: polygon(24% 0, 36% 0, 42% 9%, 58% 9%, 64% 0, 76% 0, 100% 20%, 85% 42%, 75% 34%, 75% 100%, 25% 100%, 25% 34%, 15% 42%, 0 20%); font-size: 1.1rem; font-weight: 800; text-shadow: 0 1px 3px #000; padding-top: 8px; }
+.shirt.goalkeeper { background: #d4a83a; color: #152235; text-shadow: none; }
+.player-caption { font-size: .875rem; line-height: 1.2; white-space: nowrap; }
+.playable .player-caption { font-weight: 700; }
+.player-outcome { font-size: .75rem; }
+.pitch-caption { margin-top: 12px; color: #53647a; font-size: .875rem; }
+.guess-panel { background: white; border: 1px solid #dce2e9; border-radius: 8px; padding: 24px; }
+.guess-panel h2 { font-size: 1.6rem; letter-spacing: -.035em; margin: 4px 0; }
+.muted { color: #53647a; font-size: .875rem; }
+.intro { margin-top: 18px; }
+.guess-grid { display: grid; gap: 6px; margin: 24px 0; }
+.guess-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.letter { position: relative; display: grid; place-items: center; height: 48px; border: 1px solid #d0d8e1; border-radius: 4px; font-size: 1.4rem; font-weight: 700; }
+.letter small { position: absolute; bottom: 0; right: 4px; font-size: .75rem; }
+.correct { color: white; background: #28644d; border-color: #28644d; }
+.present { color: white; background: #8a6013; border-color: #8a6013; }
+.absent { color: white; background: #536176; border-color: #536176; }
+.attempt-count { margin: -12px 0 18px; font-size: .875rem; color: #53647a; }
+.result { margin-bottom: 24px; padding: 12px; background: #edf3fb; border-radius: 4px; font-weight: 700; }
+.input-hint { margin-top: 8px; color: #53647a; font-size: .875rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; list-style: none; padding: 16px 0 0; margin: 20px 0 0; border-top: 1px solid #dce2e9; font-size: .875rem; }
+.legend li { display: flex; align-items: center; gap: 6px; }
+.legend span { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 3px; }
+form label { display: block; font-size: .875rem; font-weight: 600; margin-bottom: 6px; }
+input { width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid #8898ac; border-radius: 4px; font-size: 1.125rem; letter-spacing: .2em; text-transform: uppercase; }
+.submit { width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 4px; color: white; background: #234e9d; font-weight: 600; }
+.submit:hover:enabled { background: #183d80; }
+.submit:disabled { background: #e5e9ef; color: #56657a; }
+footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #dce2e9; font-size: .8rem; color: #53647a; }
+
+@media (max-width: 760px) {
+  .masthead { padding: 14px 18px; }
+  .masthead > span { display: none; }
+  main { padding: 24px 16px 20px; }
+  .game-layout { grid-template-columns: 1fr; gap: 24px; margin-top: 24px; }
+  .pitch { min-height: 440px; padding: 16px 4px; gap: 0; }
+  .player { padding: 4px; min-width: 58px; }
+  .guess-panel { padding: 20px; }
+  .guess-grid { max-width: 300px; }
+}

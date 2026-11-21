@@ -2,6 +2,30 @@
 
 Un quiz di calcio per PC e telefono. La prima sfida consiste nel ricordare gli undici titolari dell’Inter nel derby del 29 agosto 2009, con sei tentativi Wordle per maglia.
 
+## Avviare la prima prova
+
+Servono Node.js 22.18+ (o 24+) e npm.
+
+```sh
+npm ci
+npm run dev
+```
+
+Apri l’indirizzo `Local` stampato nel terminale sul PC. Sul telefono, collegato alla stessa rete Wi-Fi, apri l’indirizzo `Network`. Lascia il PC acceso e il comando in esecuzione; se il sistema chiede accesso alla rete locale, consentilo. Per fermare il server premi `Ctrl+C`.
+
+Il ticket 01 rende giocabile la maglia 9: selezionala, scrivi quattro lettere e invia. Le altre dieci maglie sono selezionabili ma non ancora giocabili. Dopo la risposta corretta o sei errori compare «Eto’o» e non si possono inviare altri tentativi per quella maglia. Per ora ricaricare la pagina azzera i tentativi: la persistenza appartiene al ticket 04.
+
+## Verifiche
+
+```sh
+npm run typecheck
+npm test -- tests/maglia.spec.ts --project=desktop
+npm test
+npm run build
+```
+
+I test Playwright richiedono Google Chrome installato e avviano automaticamente il server sulla porta 4173. Coprono l’interfaccia desktop e una viewport mobile con tocco emulato; non sostituiscono la prova della tastiera di sistema su un telefono reale. La build statica viene generata in `dist/`.
+
 ## Da dove iniziare
 
 La [specifica dell’MVP](.scratch/mvp/spec.md) raccoglie la formazione verificata, le regole concordate e le condizioni per la prima prova. Il [glossario](CONTEXT.md) definisce i termini del gioco.
