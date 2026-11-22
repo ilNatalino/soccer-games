@@ -19,6 +19,9 @@ _Avoid_: Partita, quando si parla del quiz.
 **Maglia**:
 Il posto sul campo che corrisponde a un singolo titolare da indovinare.
 
+**Marcatore**:
+Un calciatore a cui è attribuito almeno un gol nella partita storica.
+
 **Tentativo**:
 Una risposta completa inviata per la maglia selezionata. Correggere le lettere prima dell'invio non consuma un tentativo.
 

@@ -14,6 +14,7 @@ const lineup = reactive(derby.lineup.map(({ role, players }) => ({
     return {
       ...player,
       role,
+      scored: derby.scorerNumbers.includes(player.number),
       pattern,
       answer: pattern.replaceAll(' ', ''),
       draft: '',
@@ -60,6 +61,17 @@ const feedbackSymbols = { correct: '✓', present: '↔', absent: '×' }
 
 function letters(text: string) {
   return text.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/[^A-Z]/g, '')
+}
+
+function attemptLabel(count: number) {
+  return `${count} ${count === 1 ? 'tentativo' : 'tentativi'}`
+}
+
+function shirtDescription(shirt: Shirt) {
+  const details = []
+  if (shirt.scored) details.push('Marcatore')
+  if (shirt.outcome) details.push(attemptLabel(shirt.attempts.length))
+  return details.join(', ') || undefined
 }
 
 function restoreProgress() {
@@ -173,7 +185,7 @@ function finishEarly() {
       <section class="formation" aria-labelledby="formation-title">
         <div v-if="finished" class="challenge-result">
           <h2 ref="scoreHeading" tabindex="-1" aria-describedby="challenge-score">Sfida conclusa</h2>
-          <p id="challenge-score">{{ guessedCount }} su {{ shirts.length }} indovinati · {{ totalAttempts }} {{ totalAttempts === 1 ? 'tentativo' : 'tentativi' }}</p>
+          <p id="challenge-score">{{ guessedCount }} su {{ shirts.length }} indovinati · {{ attemptLabel(totalAttempts) }}</p>
         </div>
         <div class="section-heading">
           <h2 id="formation-title">La formazione dell’Inter</h2>
@@ -190,13 +202,20 @@ function finishEarly() {
               class="player"
               :class="{ selected: !finished && selected === player, resolved: player.outcome }"
               :aria-label="finished ? undefined : (player.outcome ? `Maglia ${player.number}, ${player.name}, ${player.outcome}` : `Maglia ${player.number}, ${line.role}`)"
+              :aria-description="finished ? undefined : shirtDescription(player)"
               :aria-pressed="finished ? undefined : selected === player"
               :aria-controls="finished ? undefined : 'guess-panel'"
               @click="!finished && selectShirt(player)"
             >
-              <span class="shirt" :class="{ goalkeeper: line.role === 'portiere' }" :aria-hidden="!finished">{{ player.number }}</span>
-              <span class="player-caption">{{ player.outcome ? player.name : '· · ·' }}</span>
-              <span v-if="player.outcome" class="player-outcome">{{ player.outcome }}</span>
+              <span class="shirt-icon">
+                <span class="shirt" :class="{ goalkeeper: line.role === 'portiere' }" :aria-hidden="!finished">{{ player.number }}</span>
+                <span v-if="player.scored" class="scorer-icon" role="img" aria-label="Marcatore" :aria-hidden="!finished">⚽</span>
+              </span>
+              <span class="player-caption">
+                <span>{{ player.outcome ? player.name : '· · ·' }}</span>
+                <span v-if="player.outcome" class="player-attempts" :title="attemptLabel(player.attempts.length)" aria-hidden="true">{{ player.attempts.length }}</span>
+                <span v-if="finished" class="visually-hidden">{{ attemptLabel(player.attempts.length) }}</span>
+              </span>
             </component>
           </div>
         </div>

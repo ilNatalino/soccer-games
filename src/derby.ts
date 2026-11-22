@@ -1,4 +1,4 @@
-// Numeri e formazione: https://www.inter.it/it/match_center/3777
+// Referto ufficiale dell'Inter: https://www.inter.it/it/match_center/3777
 export const derby = {
   home: 'Milan',
   away: 'Inter',
@@ -6,6 +6,7 @@ export const derby = {
   date: '29 agosto 2009',
   playedOn: '2009-08-29',
   formation: '4-3-1-2',
+  scorerNumbers: [8, 22, 13, 5],
   lineup: [
     { role: 'attaccante', players: [{ number: 22, name: 'Milito' }, { number: 9, name: 'Eto’o' }] },
     { role: 'trequartista', players: [{ number: 10, name: 'Sneijder' }] },

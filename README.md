@@ -15,7 +15,9 @@ Apri l’indirizzo `Local` stampato nel terminale sul PC. Sul telefono, collegat
 
 Scegli una delle undici maglie e scrivi le lettere indicate dalla griglia. Gli spazi dei nomi composti sono già al loro posto. Ogni maglia ha sei tentativi e puoi cambiare titolare e ritrovare le righe già inviate. La risposta corretta o il sesto errore chiude la maglia e mostra il nome del titolare.
 
-Quando tutte le maglie sono chiuse, il campo mostra i titolari indovinati e rivelati e il totale dei tentativi inviati. Puoi anche scegliere «Concludi» per rivelare i titolari rimasti e vedere il risultato.
+Quando tutte le maglie sono chiuse, il campo mostra gli undici titolari. Il riepilogo indica quanti ne hai indovinati e il totale dei tentativi inviati. Puoi anche scegliere «Concludi» per rivelare i titolari rimasti e vedere il risultato.
+
+Accanto a ogni nome visibile sul campo leggi il numero di tentativi inviati per quella maglia. Un piccolo pallone segnala le maglie dei marcatori fin dall’inizio.
 
 Riaprendo lo stesso indirizzo nello stesso browser ritrovi i tentativi inviati o, a sfida conclusa, il risultato definitivo. Ogni browser conserva i propri progressi.
 

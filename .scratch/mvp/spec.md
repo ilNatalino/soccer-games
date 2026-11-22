@@ -28,6 +28,7 @@ Si indovina l'Inter nel derby di Serie A **Milan–Inter 0–4 del 29 agosto 200
 
 - Puoi iniziare da qualsiasi maglia, lasciarla in sospeso e tornarci con i tentativi già fatti.
 - All'apertura vedi squadre, data, risultato e le undici maglie dell'Inter nel modulo di partenza. Quando selezioni una maglia, le caselle vuote mostrano la lunghezza del nome da indovinare.
+- Fin dall'apertura, un piccolo pallone compare accanto alla maglia di ogni titolare che ha segnato, anche quando il nome è ancora nascosto.
 - Da PC puoi scegliere le maglie con il mouse o la tastiera, digitare sulla tastiera fisica e inviare con Invio. Da telefono tocchi la maglia e usi la tastiera di sistema. In entrambi i casi si gioca in maiuscolo. Ogni casella richiede una lettera e puoi inviare solo a riga completa. Fino all'invio puoi correggere liberamente.
 - Ogni maglia usa il nome riportato nella tabella dei titolari. Per Thiago Motta la griglia richiede «THIAGO MOTTA», con lo spazio già presente.
 - Gli spazi sono già al loro posto. Per «Júlio César» vedi cinque caselle, uno spazio fisso e altre cinque caselle. Nella griglia gli accenti e gli altri segni diacritici si riducono alla lettera di base, mentre apostrofi e trattini si omettono. Quando scopri un titolare, leggi la grafia originale.
@@ -35,7 +36,7 @@ Si indovina l'Inter nel derby di Serie A **Milan–Inter 0–4 del 29 agosto 200
 - Dopo un errore ricevi il feedback Wordle sulle lettere al posto giusto, presenti altrove o assenti. Al sesto errore il gioco rivela il titolare e puoi continuare con le altre maglie.
 - Puoi scegliere «Concludi» anche con maglie ancora aperte. Se ne restano quattro, il gioco chiede «Vuoi rivelare i 4 titolari rimasti?». Con «Continua a giocare» torni al campo con i tentativi disponibili. Con «Rivela e concludi» scopri i nomi rimasti e chiudi la sfida. Quando tutte le maglie sono già indovinate o rivelate, il risultato appare automaticamente.
 - Il risultato mostra quanti titolari hai indovinato su undici e la somma di tutti i tentativi inviati, comprese le risposte corrette e gli errori sulle maglie rivelate. La rivelazione non aggiunge tentativi. Per esempio, «7 su 11 indovinati · 20 tentativi». Se indovini un titolare al terzo tentativo e gli altri dieci al primo, leggi «11 su 11 indovinati · 13 tentativi».
-- Sul campo finale si leggono tutti gli undici nomi. Ogni maglia è contrassegnata come «Indovinato» o «Rivelato». Il conteggio dei tentativi è unico per la formazione.
+- Sul campo, l'etichetta sotto ogni maglia scoperta contiene solo il nome del titolare e, alla sua destra, il numero di tentativi inviati per quella maglia. Il contatore comprende la risposta corretta e mostra 0 se il gioco rivela il titolare senza tentativi. A sfida conclusa si leggono tutti gli undici nomi con i rispettivi contatori.
 - Dopo ogni invio il browser conserva tentativi e stato delle maglie. Una sfida in corso riprende da dove l'hai lasciata. A sfida conclusa, ricaricare o riaprire lo stesso indirizzo nello stesso browser restituisce il primo risultato definitivo, senza un comando per ricominciare.
 
 ## Ordine di sviluppo e verifiche
