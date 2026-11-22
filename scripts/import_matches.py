@@ -16,12 +16,16 @@ REPO = Path(__file__).resolve().parents[1]
 OUTPUT = REPO / 'src' / 'strikerapi'
 NAME_OVERRIDES = REPO / 'src' / 'strikerapi-name-overrides.json'
 ENV_FILE = REPO / '.env'
-MATCH_COUNT = 3
 SAMPLES = (
-    (2001, '2002-05-05', 'LAZ', 'INT', (4, 2)),
     (2009, '2009-08-29', 'MIL', 'INT', (0, 4)),
+    (2022, '2023-01-13', 'NAP', 'JUV', (5, 1)),
+    (2022, '2023-04-23', 'JUV', 'NAP', (0, 1)),
     (2022, '2023-05-07', 'NAP', 'FIO', (1, 0)),
+    (2023, '2023-09-16', 'INT', 'MIL', (5, 1)),
+    (2023, '2023-11-26', 'JUV', 'INT', (1, 1)),
+    (2023, '2024-02-10', 'ROMA', 'INT', (2, 4)),
     (2023, '2024-04-22', 'MIL', 'INT', (1, 2)),
+    (2024, '2024-10-27', 'INT', 'JUV', (4, 4)),
 )
 
 
@@ -191,7 +195,7 @@ def cache_team_colors(team_id, season, key, requested_seasons):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Importa tre partite di Serie A nel formato originale di StrikerAPI.')
+    parser = argparse.ArgumentParser(description='Importa le partite del calendario nel formato originale di StrikerAPI.')
     parser.add_argument('--key-file', type=Path, help='File privato contenente la chiave StrikerAPI')
     args = parser.parse_args()
     try:
@@ -229,11 +233,9 @@ def main():
         if new_palettes:
             print(f'{new_palettes} nuove palette salvate.')
         saved += 1
-        if saved == MATCH_COUNT:
-            break
 
-    print(f'{saved}/{MATCH_COUNT} risposte StrikerAPI salvate.')
-    return int(saved != MATCH_COUNT)
+    print(f'{saved}/{len(SAMPLES)} risposte StrikerAPI salvate.')
+    return int(saved != len(SAMPLES))
 
 
 if __name__ == '__main__':

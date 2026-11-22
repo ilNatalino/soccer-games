@@ -1,4 +1,5 @@
 import playerNameOverrides from './strikerapi-name-overrides.json'
+import teamShirtOverrides from './team-shirt-overrides.json'
 
 export interface StrikerTeam {
   team_id: string
@@ -59,12 +60,23 @@ export const strikerMatches = Object.values(import.meta.glob<{ data: StrikerMatc
   import: 'default',
 })).map(({ data }) => data)
 
-export const teamColors = new Map(Object.values(import.meta.glob<{
-  team_id: string
+interface ShirtPalette {
   color: string
-  alt_color?: string
   text_color?: string
-}>('./strikerapi/team-colors/*.json', { eager: true, import: 'default' })).map(palette => [palette.team_id, palette]))
+  accent_color?: string
+  pattern?: string
+  band_colors?: string[]
+}
+
+const importedTeamColors = import.meta.glob<ShirtPalette & { team_id: string }>(
+  './strikerapi/team-colors/*.json',
+  { eager: true, import: 'default' },
+)
+
+export const teamColors = new Map<string, ShirtPalette>([
+  ...Object.values(importedTeamColors).map(palette => [palette.team_id, palette] as const),
+  ...Object.entries(teamShirtOverrides),
+])
 
 const shortNames = new Map(Object.values(import.meta.glob<{ player_id: string; short_name: string }>(
   './strikerapi/short-names/*.json',

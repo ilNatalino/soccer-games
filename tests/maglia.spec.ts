@@ -24,10 +24,14 @@ test('il derby mostra undici maglie e permette di aprire la numero 9', async ({ 
   }
   await expect(page.locator('.player-attempts')).toHaveCount(0)
 
+  const field = page.locator('.pitch')
   const panel = page.getByRole('region', { name: 'Tentativi', exact: true })
   const input = panel.getByRole('textbox', { name: 'Il tuo tentativo' })
   await expect(panel.locator('form:first-child > input:first-child')).toBeVisible()
   await expect(input).toBeDisabled()
+  const fieldSize = (await field.boundingBox())!
+  const { width, height } = fieldSize
+  expect(await panel.boundingBox()).toMatchObject({ width, height })
 
   const shirt = page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true })
   if (isMobile) await shirt.tap()
@@ -39,6 +43,9 @@ test('il derby mostra undici maglie e permette di aprire la numero 9', async ({ 
   await expect(page.getByRole('button', { name: 'Invia', exact: true })).toBeDisabled()
   const row = page.getByRole('group', { name: 'Tentativo 1', exact: true })
   await expect(row.getByLabel('Casella vuota')).toHaveCount(4)
+  expect(await field.boundingBox()).toMatchObject({ width, height })
+  expect(await panel.boundingBox()).toMatchObject({ width, height })
+  expect(await panel.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
@@ -47,6 +54,10 @@ test('si corregge una riga prima di inviarla e le O duplicate ricevono il feedba
   await page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true }).click()
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
   const submit = page.getByRole('button', { name: 'Invia', exact: true })
+  const first = page.getByRole('group', { name: 'Tentativo 1', exact: true })
+  const { x, width } = (await input.boundingBox())!
+  expect(await first.boundingBox()).toMatchObject({ x, width })
+
   await input.pressSequentially('oo')
   await expect(submit).toBeDisabled()
   await input.press('Enter')
@@ -57,7 +68,6 @@ test('si corregge una riga prima di inviarla e le O duplicate ricevono il feedba
   await expect(submit).toBeEnabled()
   await input.press('Enter')
 
-  const first = page.getByRole('group', { name: 'Tentativo 1', exact: true })
   for (const [index, label] of ['O: assente', 'O: assente', 'O: posizione corretta', 'O: posizione corretta'].entries()) {
     await expect(first.getByRole('img').nth(index)).toHaveAccessibleName(label)
   }
@@ -295,11 +305,12 @@ test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato por
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
-test('annullare Concludi conserva i tentativi e confermare salva il risultato con i quattro titolari rivelati', async ({ page, context, isMobile }) => {
+test('annullare Termina conserva i tentativi e confermare salva il risultato con i quattro titolari rivelati', async ({ page, context, isMobile }) => {
   await page.goto(demoUrl)
-  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
-  const submit = page.getByRole('button', { name: 'Invia', exact: true })
-  const conclude = page.getByRole('button', { name: 'Concludi', exact: true })
+  const panel = page.getByRole('region', { name: 'Tentativi', exact: true })
+  const input = panel.getByRole('textbox', { name: 'Il tuo tentativo' })
+  const submit = panel.getByRole('button', { name: 'Invia', exact: true })
+  const conclude = panel.getByRole('button', { name: 'Termina', exact: true })
   const dialog = page.getByRole('dialog', { name: 'Vuoi rivelare i 4 titolari rimasti?' })
   const cancel = dialog.getByRole('button', { name: 'Continua a giocare' })
   const confirm = dialog.getByRole('button', { name: 'Rivela e concludi' })
@@ -357,7 +368,7 @@ test('il sesto errore sull’ultima maglia conclude la sfida e il risultato rest
   }
   await playShirt(page, 9, Array<string>(5).fill('ZZZZ'))
   await expect(page.getByRole('group', { name: 'Tentativo 5', exact: true }).getByLabel('Z: assente')).toHaveCount(4)
-  const conclude = page.getByRole('button', { name: 'Concludi', exact: true })
+  const conclude = page.getByRole('button', { name: 'Termina', exact: true })
   const dialog = page.getByRole('dialog', { name: 'Vuoi rivelare 1 titolare rimasto?' })
   await expect(page.getByRole('textbox', { name: 'Il tuo tentativo' })).toBeFocused()
   await conclude.dispatchEvent('click')
@@ -386,7 +397,7 @@ test('una scheda già aperta mostra l’esito salvato della maglia o della sfida
   await playShirt(other, 9, ['OTTO'])
   await expect(other.getByRole('button', { name: 'Maglia 9, Eto’o, Indovinato' })).toBeFocused()
 
-  await page.getByRole('button', { name: 'Concludi', exact: true }).click()
+  await page.getByRole('button', { name: 'Termina', exact: true }).click()
   await page.getByRole('button', { name: 'Rivela e concludi' }).click()
 
   await playShirt(other, 22, ['MILITO'])

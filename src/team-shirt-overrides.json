@@ -1,0 +1,28 @@
+{
+  "103": { "color": "#E4002B", "accent_color": "#151515", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "104": { "color": "#990A2C", "accent_color": "#F4AA2A", "text_color": "#FFFFFF", "pattern": "trim" },
+  "105": { "color": "#1157BF", "accent_color": "#121212", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "106": { "color": "#F7F7F5", "accent_color": "#C8192B", "text_color": "#152235", "pattern": "trim" },
+  "107": { "color": "#A51C30", "accent_color": "#142449", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "109": { "color": "#4C1D84", "accent_color": "#F5F1F8", "text_color": "#FFFFFF", "pattern": "trim" },
+  "110": { "color": "#00239C", "accent_color": "#151E2F", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "111": { "color": "#F7F7F5", "accent_color": "#151515", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "112": { "color": "#74BDE7", "accent_color": "#F8FAFC", "text_color": "#152235", "pattern": "trim" },
+  "114": { "color": "#0677D2", "accent_color": "#F8FAFC", "text_color": "#FFFFFF", "pattern": "trim" },
+  "115": { "color": "#F7F7F2", "accent_color": "#171717", "text_color": "#FFFFFF", "pattern": "cross" },
+  "118": { "color": "#F4F4F1", "accent_color": "#19161D", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "238": { "color": "#FFD62C", "accent_color": "#163C91", "text_color": "#152235", "pattern": "sleeves" },
+  "2734": {
+    "color": "#2234A4",
+    "accent_color": "#F7F7F5",
+    "band_colors": ["#C92337", "#171717"],
+    "text_color": "#FFFFFF",
+    "pattern": "bands"
+  },
+  "2735": { "color": "#FFFFFF", "accent_color": "#1A1A1A", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "2923": { "color": "#F9BED4", "accent_color": "#1A1A1A", "text_color": "#152235", "pattern": "trim" },
+  "2925": { "color": "#C42239", "accent_color": "#192A4D", "text_color": "#FFFFFF", "pattern": "halves" },
+  "2926": { "color": "#8D2638", "text_color": "#FFFFFF" },
+  "3258": { "color": "#D91B25", "accent_color": "#409FFF", "text_color": "#FFFFFF", "pattern": "stripes" },
+  "3263": { "color": "#BA1B32", "accent_color": "#08305D", "text_color": "#FFFFFF", "pattern": "halves" }
+}

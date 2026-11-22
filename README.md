@@ -1,6 +1,6 @@
 # Missing XI — Serie A
 
-Un quiz di calcio per PC e telefono. La prima sfida consiste nel ricordare gli undici titolari dell’Inter nel derby del 29 agosto 2009, con sei tentativi Wordle per maglia.
+Un quiz di calcio per PC e telefono. Ogni giorno c’è una sfida per ricordare gli undici titolari di una partita storica di Serie A, con sei tentativi Wordle per maglia.
 
 ## Avviare la prima prova
 
@@ -13,6 +13,8 @@ npm run dev
 
 Apri l’indirizzo `Local` stampato nel terminale sul PC. Sul telefono, collegato alla stessa rete Wi-Fi, apri l’indirizzo `Network`. Lascia il PC acceso e il comando in esecuzione; se il sistema chiede accesso alla rete locale, consentilo. Per fermare il server premi `Ctrl+C`.
 
+Per provare subito il derby del 29 agosto 2009, aggiungi `/?partita=demo` all’indirizzo del gioco. Per giocare le sfide del calendario, importa le partite come descritto qui sotto.
+
 Scegli una delle undici maglie e scrivi le lettere indicate dalla griglia. Gli spazi dei nomi composti sono già al loro posto. Ogni maglia ha sei tentativi e puoi cambiare titolare e ritrovare le righe già inviate. La risposta corretta o il sesto errore chiude la maglia e mostra il nome del titolare.
 
 Quando tutte le maglie sono chiuse, il campo mostra gli undici titolari. Il riepilogo indica quanti ne hai indovinati e il totale dei tentativi inviati. Puoi anche scegliere «Concludi» per rivelare i titolari rimasti e vedere il risultato.
@@ -21,7 +23,7 @@ Accanto a ogni nome visibile sul campo leggi il numero di tentativi inviati per 
 
 Riaprendo lo stesso indirizzo nello stesso browser ritrovi i tentativi inviati o, a sfida conclusa, il risultato definitivo. Ogni browser conserva i propri progressi.
 
-## Provare tre partite da StrikerAPI
+## Importare le partite da StrikerAPI
 
 Inserisci la chiave dopo `STRIKERAPI_KEY=` nel file privato `.env` nella radice del progetto. Se il file manca, crealo con permessi `600`. Git lo ignora. Avvia l’importazione con Python 3 da un terminale con accesso alla rete.
 
@@ -29,15 +31,21 @@ Inserisci la chiave dopo `STRIKERAPI_KEY=` nel file privato `.env` nella radice 
 python3 scripts/import_matches.py
 ```
 
-Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con la sola chiave tramite `--key-file`. Parte da Lazio–Inter (2002), Milan–Inter (2009) e Napoli–Fiorentina (2023). Se una formazione è incompleta, prova le partite successive del campione fino a salvare tre risposte valide. I JSON originali finiscono in `src/strikerapi/`, esclusa da Git. La build include i dati importati nel JavaScript inviato al browser.
+Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con la sola chiave tramite `--key-file`. Importa le partite del primo calendario. I JSON originali finiscono in `src/strikerapi/`, esclusa da Git. La build include i dati importati nel JavaScript inviato al browser.
 
-L’app mostra le partite importate e propone di indovinare la squadra ospite in ciascuna. Se la cartella è vuota si apre il derby dimostrativo. La demo resta accessibile su `/?partita=demo`.
+Quando la palette della squadra da indovinare manca dalla cache, l’importatore chiede a `list_teams` le squadre della stagione e salva le palette disponibili per `team_id` in `src/strikerapi/team-colors/`. Le importazioni successive riusano i colori salvati.
 
-Quando manca la palette della squadra da indovinare, l’importatore chiede a `list_teams` le squadre della stagione e salva le palette disponibili per `team_id` in `src/strikerapi/team-colors/`. Le importazioni successive riusano i colori salvati. Se i colori mancano, sul campo appare una maglia neutra e una nuova importazione può riprovare.
+Le [palette personalizzate delle maglie](src/team-shirt-overrides.json) hanno la precedenza e sono indicizzate per `team_id`. Ogni voce indica il colore di base (`color`), il colore del numero (`text_color`) ed eventualmente un motivo (`pattern`) e un colore secondario (`accent_color`). Per le altre squadre il gioco usa la palette importata o la maglia neutra.
 
 L’importazione cerca il nome breve solo per i titolari della squadra da indovinare e lo salva per ID in `src/strikerapi/short-names/`. Ogni giocatore già in cache evita una ricerca nelle partite successive. La griglia usa il nome breve senza l’eventuale iniziale, oppure il nome della formazione se la ricerca non restituisce un nome breve.
 
 Le [correzioni dei nomi](src/strikerapi-name-overrides.json) sono indicizzate per `player_id`. Imposta `name` per tutte le partite di un giocatore o aggiungi `team_id` se la correzione vale solo per una squadra. Júlio César è limitato all’Inter perché StrikerAPI gli associa l’ID di Julio César De León. Una correzione applicabile ha la precedenza e evita la ricerca del nome breve.
+
+## Aggiornare il calendario delle sfide
+
+La pagina principale apre la sfida di oggi e mostra anche i sette giorni precedenti, secondo il fuso italiano. Una data senza una partita importata mostra «Sfida non disponibile».
+
+In [src/calendar.json](src/calendar.json) associa una data di pubblicazione `AAAA-MM-GG` al `data.game.game_id` di una partita importata. Scegli una partita diversa per ogni data e prepara più giorni prima della prossima build. Il primo calendario copre il 15–23 novembre 2026. Per importare altre partite, aggiungile all’elenco in [scripts/import_matches.py](scripts/import_matches.py) e riesegui lo script.
 
 ## Verifiche
 
