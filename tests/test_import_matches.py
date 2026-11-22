@@ -70,5 +70,50 @@ class ShortNameImportTests(unittest.TestCase):
                     request.assert_called_once_with('search_players', 'key', name='Julio César De León', limit=15)
 
 
+class TeamColorsImportTests(unittest.TestCase):
+    def test_saves_all_valid_palettes_and_keeps_the_first_value_for_each_team(self):
+        first_season = {'data': {'teams': [
+            {'team_id': '110', 'color': ' 3777D6 ', 'alt_color': '#151E2F', 'text_color': 'FFFFFF'},
+            {'team_id': '109', 'color': '503187', 'alt_color': 'invalid'},
+            {'team_id': '114', 'color': 'invalid'},
+        ]}}
+        second_season = {'data': {'teams': [
+            {'team_id': '110', 'color': '000000'},
+            {'team_id': '114', 'color': '2585C8'},
+        ]}}
+        responses = [json.dumps(season).encode() for season in (first_season, second_season)]
+
+        with TemporaryDirectory() as output, patch.object(import_matches, 'OUTPUT', Path(output)):
+            directory = Path(output) / 'team-colors'
+            with patch.object(import_matches, 'request_data', side_effect=responses) as request:
+                self.assertEqual(import_matches.cache_team_colors('110', 2009, 'key', set()), 2)
+                self.assertEqual(import_matches.cache_team_colors('109', 2022, 'key', set()), 0)
+                self.assertEqual(import_matches.cache_team_colors('110', 2023, 'key', set()), 0)
+                request.assert_called_once_with('list_teams', 'key', season=2009)
+                self.assertFalse((directory / '114.json').exists())
+                self.assertEqual(import_matches.cache_team_colors('114', 2023, 'key', set()), 1)
+
+            self.assertEqual(json.loads((directory / '110.json').read_bytes()), {
+                'team_id': '110', 'color': '#3777d6', 'alt_color': '#151e2f', 'text_color': '#ffffff',
+            })
+            self.assertEqual(json.loads((directory / '109.json').read_bytes()), {
+                'team_id': '109', 'color': '#503187',
+            })
+
+    def test_failed_lookup_is_retried_on_a_later_import(self):
+        response = b'{"data":{"teams":[{"team_id":"110","color":"3777d6"}]}}'
+        with TemporaryDirectory() as output, patch.object(import_matches, 'OUTPUT', Path(output)):
+            with patch.object(import_matches, 'request_data', side_effect=[RuntimeError('offline'), response]) as request:
+                with patch('builtins.print') as report:
+                    requested_seasons = set()
+                    self.assertEqual(import_matches.cache_team_colors('110', 2009, 'key', requested_seasons), 0)
+                    self.assertEqual(import_matches.cache_team_colors('109', 2009, 'key', requested_seasons), 0)
+                    report.assert_called_once()
+                request.assert_called_once_with('list_teams', 'key', season=2009)
+                self.assertFalse((Path(output) / 'team-colors').exists())
+                self.assertEqual(import_matches.cache_team_colors('110', 2009, 'key', set()), 1)
+                self.assertEqual(request.call_count, 2)
+
+
 if __name__ == '__main__':
     unittest.main()

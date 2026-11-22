@@ -132,6 +132,64 @@ def cache_short_names(match, key, searched):
     return saved
 
 
+def hex_color(value):
+    if isinstance(value, str) and re.fullmatch(r'#?[0-9a-fA-F]{6}', value.strip()):
+        return f'#{value.strip().lstrip("#").lower()}'
+
+
+def has_team_colors(path, team_id):
+    try:
+        palette = json.loads(path.read_bytes())
+    except (ValueError, OSError):
+        return False
+    if not isinstance(palette, dict) or palette.get('team_id') != team_id:
+        return False
+    color = palette.get('color')
+    return isinstance(color, str) and color == hex_color(color)
+
+
+def cache_team_colors(team_id, season, key, requested_seasons):
+    directory = OUTPUT / 'team-colors'
+    team_path = directory / f'{quote(team_id, safe="")}.json'
+    if season in requested_seasons or has_team_colors(team_path, team_id):
+        return 0
+
+    requested_seasons.add(season)
+    try:
+        teams = json.loads(request_data('list_teams', key, season=season))['data']['teams']
+        if not isinstance(teams, list):
+            raise ValueError('elenco delle squadre non valido')
+    except (ValueError, KeyError, TypeError, RuntimeError) as error:
+        print(f'Colori non recuperati per la stagione {season}: {error}')
+        return 0
+
+    saved = 0
+    for team in teams:
+        if not isinstance(team, dict):
+            continue
+        listed_id = team.get('team_id')
+        color = hex_color(team.get('color'))
+        if not isinstance(listed_id, str) or not listed_id.strip() or color is None:
+            continue
+        path = directory / f'{quote(listed_id, safe="")}.json'
+        if has_team_colors(path, listed_id):
+            continue
+
+        palette = {'team_id': listed_id, 'color': color}
+        for field in ('alt_color', 'text_color'):
+            if optional_color := hex_color(team.get(field)):
+                palette[field] = optional_color
+        try:
+            save_response(path, json.dumps(palette).encode())
+            saved += 1
+        except OSError as error:
+            print(f'Colori non salvati per la squadra {listed_id}: {error}')
+
+    if not has_team_colors(team_path, team_id):
+        print(f'Colori non disponibili per la squadra {team_id} nella stagione {season}.')
+    return saved
+
+
 def main():
     parser = argparse.ArgumentParser(description='Importa tre partite di Serie A nel formato originale di StrikerAPI.')
     parser.add_argument('--key-file', type=Path, help='File privato contenente la chiave StrikerAPI')
@@ -148,6 +206,7 @@ def main():
 
     saved = 0
     searched = set()
+    requested_seasons = set()
     for season, day, home, away, score in SAMPLES:
         print(f'{day} {home}–{away}: richiesta a StrikerAPI…', flush=True)
         try:
@@ -164,8 +223,11 @@ def main():
 
         path = OUTPUT / f'{day}.json'
         save_response(path, raw_response)
+        new_palettes = cache_team_colors(match['game']['away']['team_id'], season, key, requested_seasons)
         new_names = cache_short_names(match, key, searched)
         print(f'{path.relative_to(OUTPUT.parents[1])} · {new_names} nuovi nomi brevi')
+        if new_palettes:
+            print(f'{new_palettes} nuove palette salvate.')
         saved += 1
         if saved == MATCH_COUNT:
             break

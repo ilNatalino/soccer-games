@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, useTemplateRef } from 'vue'
-import { orderStarters, quizPlayerName, type StrikerMatch } from './strikerapi'
+import { orderStarters, quizPlayerName, teamColors, type StrikerMatch } from './strikerapi'
 import { evaluateGuess } from './wordle'
 import './style.css'
 
@@ -8,6 +8,13 @@ const { match, matches } = defineProps<{ match: StrikerMatch; matches: StrikerMa
 const { game } = match
 const formation = match.lineups.find(team => team.team_id === game.away.team_id)!
 const isDemo = game.game_id === 'demo'
+const paletteTeamId = formation.team_id === 'inter' ? '110' : formation.team_id
+const palette = teamColors.get(paletteTeamId)
+const stripedShirts = paletteTeamId === '110' && (isDemo || Boolean(palette))
+const shirtColors = {
+  '--shirt-color': palette?.color,
+  '--shirt-number-color': palette?.text_color,
+}
 const dateLabel = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(game.date))
 const maxAttempts = 6
 const progressKey = isDemo
@@ -233,7 +240,7 @@ function finishEarly() {
           <h2 id="formation-title">{{ game.away.name }}</h2>
           <span>{{ formation.formation }}</span>
         </div>
-        <div ref="pitch" class="pitch">
+        <div ref="pitch" class="pitch" :class="{ 'striped-shirts': stripedShirts }" :style="shirtColors">
           <div class="pitch-markings" aria-hidden="true"><i></i></div>
           <div v-for="line in lineup" :key="line.row" class="pitch-row" :style="{ '--shirts-in-row': line.players.length }">
             <component

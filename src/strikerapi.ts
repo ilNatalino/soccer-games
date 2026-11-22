@@ -59,6 +59,13 @@ export const strikerMatches = Object.values(import.meta.glob<{ data: StrikerMatc
   import: 'default',
 })).map(({ data }) => data)
 
+export const teamColors = new Map(Object.values(import.meta.glob<{
+  team_id: string
+  color: string
+  alt_color?: string
+  text_color?: string
+}>('./strikerapi/team-colors/*.json', { eager: true, import: 'default' })).map(palette => [palette.team_id, palette]))
+
 const shortNames = new Map(Object.values(import.meta.glob<{ player_id: string; short_name: string }>(
   './strikerapi/short-names/*.json',
   { eager: true, import: 'default' },
