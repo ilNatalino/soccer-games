@@ -1,3 +1,5 @@
+import playerNameOverrides from './strikerapi-name-overrides.json'
+
 export interface StrikerTeam {
   team_id: string
   name: string
@@ -24,6 +26,8 @@ export interface StrikerMatch {
     }[]
   }[]
 }
+
+type Starter = StrikerMatch['lineups'][number]['starting_xi'][number]
 
 const positions = [
   /\bgoalkeeper\b/i,
@@ -54,3 +58,18 @@ export const strikerMatches = Object.values(import.meta.glob<{ data: StrikerMatc
   eager: true,
   import: 'default',
 })).map(({ data }) => data)
+
+const shortNames = new Map(Object.values(import.meta.glob<{ player_id: string; short_name: string }>(
+  './strikerapi/short-names/*.json',
+  { eager: true, import: 'default' },
+)).map(({ player_id, short_name }) => [player_id, short_name]))
+
+const nameOverrides = new Map<string, { name: string; team_id?: string }>(Object.entries(playerNameOverrides))
+
+export function quizPlayerName(teamId: string, player: Starter) {
+  const playerId = String(player.player_id)
+  const override = nameOverrides.get(playerId)
+  if (override && (override.team_id === undefined || override.team_id === teamId)) return override.name
+
+  return shortNames.get(playerId)?.replace(/^\p{L}\p{M}*\.\s+/u, '') || player.name
+}

@@ -8,11 +8,13 @@ import unicodedata
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 
 REPO = Path(__file__).resolve().parents[1]
 OUTPUT = REPO / 'src' / 'strikerapi'
+NAME_OVERRIDES = REPO / 'src' / 'strikerapi-name-overrides.json'
 ENV_FILE = REPO / '.env'
 MATCH_COUNT = 3
 SAMPLES = (
@@ -30,7 +32,8 @@ def request_data(tool, key, **params):
         headers={'Content-Type': 'application/json'},
     )
     request.add_unredirected_header('X-API-Key', key)
-    for attempt in range(2):
+    attempts = 1 if tool == 'search_players' else 2
+    for attempt in range(attempts):
         try:
             with urlopen(request, timeout=20) as response:
                 return response.read()
@@ -39,9 +42,9 @@ def request_data(tool, key, **params):
         except (URLError, TimeoutError, socket.timeout) as error:
             reason = error.reason if isinstance(error, URLError) else error
             if isinstance(reason, (TimeoutError, socket.timeout)):
-                if attempt == 0:
+                if attempt + 1 < attempts:
                     continue
-                detail = 'tempo di attesa della risposta scaduto dopo due tentativi.'
+                detail = 'tempo di attesa della risposta scaduto.'
             elif isinstance(reason, socket.gaierror):
                 detail = 'DNS: impossibile risolvere mcp.strikerapi.com. Verifica che il comando abbia accesso alla rete.'
             elif isinstance(reason, ssl.SSLCertVerificationError):
@@ -90,7 +93,7 @@ def validate_match(match, game_id, day, score):
             raise ValueError('marcatori del derby discordanti con il referto')
 
 
-def save_match(path, raw_response):
+def save_response(path, raw_response):
     path.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile(dir=path.parent, delete=False) as temporary:
         temporary_path = Path(temporary.name)
@@ -100,6 +103,33 @@ def save_match(path, raw_response):
             temporary_path.replace(path)
         finally:
             temporary_path.unlink(missing_ok=True)
+
+
+def cache_short_names(match, key, searched):
+    away_id = match['game']['away']['team_id']
+    lineup = next(team for team in match['lineups'] if team['team_id'] == away_id)
+    overrides = json.loads(NAME_OVERRIDES.read_bytes())
+    saved = 0
+    for player in lineup['starting_xi']:
+        player_id = str(player['player_id'])
+        override = overrides.get(player_id)
+        if override and override.get('team_id', away_id) == away_id:
+            continue
+        path = OUTPUT / 'short-names' / f'{quote(player_id, safe="")}.json'
+        if player_id in searched or path.is_file():
+            continue
+        searched.add(player_id)
+        try:
+            profiles = json.loads(request_data('search_players', key, name=player['name'], limit=15))['data']['players']
+            profile = next((item for item in profiles if str(item['player_id']) == player_id), {})
+            short_name = profile.get('short_name')
+            if isinstance(short_name, str) and short_name.strip():
+                cached = {'player_id': player_id, 'short_name': short_name.strip()}
+                save_response(path, json.dumps(cached, ensure_ascii=False).encode())
+                saved += 1
+        except (ValueError, KeyError, TypeError, RuntimeError, OSError) as error:
+            print(f'Nome breve non recuperato per {player["name"]}: {error}')
+    return saved
 
 
 def main():
@@ -117,6 +147,7 @@ def main():
         parser.error(f'compila STRIKERAPI_KEY in {ENV_FILE.name}, impostala nell’ambiente o usa --key-file')
 
     saved = 0
+    searched = set()
     for season, day, home, away, score in SAMPLES:
         print(f'{day} {home}–{away}: richiesta a StrikerAPI…', flush=True)
         try:
@@ -125,14 +156,16 @@ def main():
             if fixture is None:
                 raise ValueError('incontro assente nella risposta')
             raw_response = request_data('get_lineups', key, game_id=fixture['game_id'])
-            validate_match(json.loads(raw_response)['data'], fixture['game_id'], day, score)
+            match = json.loads(raw_response)['data']
+            validate_match(match, fixture['game_id'], day, score)
         except (ValueError, KeyError, TypeError, RuntimeError) as error:
             print(f'{day} {home}–{away}: {error}')
             continue
 
         path = OUTPUT / f'{day}.json'
-        save_match(path, raw_response)
-        print(path.relative_to(OUTPUT.parents[1]))
+        save_response(path, raw_response)
+        new_names = cache_short_names(match, key, searched)
+        print(f'{path.relative_to(OUTPUT.parents[1])} · {new_names} nuovi nomi brevi')
         saved += 1
         if saved == MATCH_COUNT:
             break

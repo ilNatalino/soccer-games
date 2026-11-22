@@ -33,6 +33,10 @@ Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con
 
 L’app mostra le partite importate e propone di indovinare la squadra ospite in ciascuna. Se la cartella è vuota si apre il derby dimostrativo. La demo resta accessibile su `/?partita=demo`.
 
+L’importazione cerca il nome breve solo per i titolari della squadra da indovinare e lo salva per ID in `src/strikerapi/short-names/`. Ogni giocatore già in cache evita una ricerca nelle partite successive. La griglia usa il nome breve senza l’eventuale iniziale, oppure il nome della formazione se la ricerca non restituisce un nome breve.
+
+Le [correzioni dei nomi](src/strikerapi-name-overrides.json) sono indicizzate per `player_id`. Imposta `name` per tutte le partite di un giocatore o aggiungi `team_id` se la correzione vale solo per una squadra. Júlio César è limitato all’Inter perché StrikerAPI gli associa l’ID di Julio César De León. Una correzione applicabile ha la precedenza e evita la ricerca del nome breve.
+
 ## Verifiche
 
 ```sh

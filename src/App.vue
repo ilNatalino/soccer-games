@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, useTemplateRef } from 'vue'
-import { orderStarters, type StrikerMatch } from './strikerapi'
+import { orderStarters, quizPlayerName, type StrikerMatch } from './strikerapi'
 import { evaluateGuess } from './wordle'
 import './style.css'
 
@@ -18,11 +18,13 @@ const starters = orderStarters(formation.starting_xi)
 let offset = 0
 const lineup = reactive([1, ...formation.formation.split('-').map(Number)].map((size, row, rows) => {
   const players = starters.slice(offset, offset + size).map(player => {
-    const pattern = player.name.trim().split(/\s+/).map(letters).join(' ')
+    const preferredName = isDemo ? player.name : quizPlayerName(formation.team_id, player)
+    const name = letters(preferredName) ? preferredName : player.name
     return {
       player,
-      pattern,
-      answer: pattern.replaceAll(' ', ''),
+      name,
+      pattern: namePattern(name),
+      get answer() { return this.pattern.replaceAll(' ', '') },
       draft: '',
       attempts: [] as string[],
       get outcome(): 'Indovinato' | 'Rivelato' | '' {
@@ -75,6 +77,10 @@ function letters(text: string) {
   return text.normalize('NFD').replace(/\p{M}/gu, '').toUpperCase().replace(/[^A-Z]/g, '')
 }
 
+function namePattern(name: string) {
+  return name.trim().split(/\s+/).map(letters).join(' ')
+}
+
 function attemptLabel(count: number) {
   return `${count} ${count === 1 ? 'tentativo' : 'tentativi'}`
 }
@@ -95,17 +101,29 @@ function restoreProgress() {
     if (!('endedEarly' in saved) || typeof saved.endedEarly !== 'boolean') return
     const byNumber = saved.attempts
     if (!byNumber || typeof byNumber !== 'object' || Array.isArray(byNumber)) return
+    const names = 'names' in saved ? saved.names : undefined
+    if (names !== undefined && (!names || typeof names !== 'object' || Array.isArray(names))) return
 
     const restored = shirts.map(shirt => {
-      const guesses = (byNumber as Record<string, unknown>)[shirt.player.jersey]
+      const { jersey } = shirt.player
+      const guesses = (byNumber as Record<string, unknown>)[jersey]
       if (!Array.isArray(guesses) || guesses.length > maxAttempts) return
+      const name = names === undefined ? shirt.player.name : (names as Record<string, unknown>)[jersey]
+      if (typeof name !== 'string' || !letters(name)) return
+      const pattern = namePattern(name)
+      const answer = pattern.replaceAll(' ', '')
       if (guesses.every((guess: unknown, index): guess is string => typeof guess === 'string'
-        && guess.length === shirt.answer.length && letters(guess) === guess
-        && (guess !== shirt.answer || index === guesses.length - 1))) return { shirt, guesses }
+        && guess.length === answer.length && letters(guess) === guess
+        && (guess !== answer || index === guesses.length - 1))) return { shirt, guesses, name, pattern }
     })
     if (!restored.every(entry => entry !== undefined)) return
 
-    for (const { shirt, guesses } of restored) shirt.attempts = guesses
+    for (const { shirt, guesses, name, pattern } of restored) {
+      if (shirt.name !== name) shirt.draft = ''
+      shirt.name = name
+      shirt.pattern = pattern
+      shirt.attempts = guesses
+    }
     endedEarly.value = saved.endedEarly
     lastSnapshot = snapshot
     if ('selectedNumber' in saved) return shirts.find(shirt => shirt.player.jersey === String(saved.selectedNumber))
@@ -120,6 +138,7 @@ function saveProgress() {
       endedEarly: endedEarly.value,
       selectedNumber: selected.value?.player.jersey ?? null,
       attempts: Object.fromEntries(shirts.map(shirt => [shirt.player.jersey, shirt.attempts])),
+      names: Object.fromEntries(shirts.map(shirt => [shirt.player.jersey, shirt.name])),
     })
     // shortcut: tabs can race between read and write, use transactional storage if supporting simultaneous play.
     localStorage.setItem(progressKey, snapshot)
@@ -224,7 +243,7 @@ function finishEarly() {
               :type="finished ? undefined : 'button'"
               class="player"
               :class="{ selected: !finished && selected === shirt, resolved: shirt.outcome }"
-              :aria-label="finished ? undefined : (shirt.outcome ? `Maglia ${shirt.player.jersey}, ${shirt.player.name}, ${shirt.outcome}` : `Maglia ${shirt.player.jersey}, ${line.role}`)"
+              :aria-label="finished ? undefined : (shirt.outcome ? `Maglia ${shirt.player.jersey}, ${shirt.name}, ${shirt.outcome}` : `Maglia ${shirt.player.jersey}, ${line.role}`)"
               :aria-description="finished ? undefined : shirtDescription(shirt)"
               :aria-pressed="finished ? undefined : selected === shirt"
               :aria-controls="finished ? undefined : 'guess-panel'"
@@ -235,7 +254,7 @@ function finishEarly() {
                 <span v-if="shirt.player.goals > 0" class="scorer-icon" role="img" aria-label="Marcatore" :aria-hidden="!finished">⚽</span>
               </span>
               <span class="player-caption">
-                <span>{{ shirt.outcome ? shirt.player.name : '· · ·' }}</span>
+                <span>{{ shirt.outcome ? shirt.name : '· · ·' }}</span>
                 <span v-if="shirt.outcome" class="player-attempts" :title="attemptLabel(shirt.attempts.length)" aria-hidden="true">{{ shirt.attempts.length }}</span>
                 <span v-if="finished" class="visually-hidden">{{ attemptLabel(shirt.attempts.length) }}</span>
               </span>
