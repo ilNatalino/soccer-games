@@ -21,6 +21,18 @@ Accanto a ogni nome visibile sul campo leggi il numero di tentativi inviati per 
 
 Riaprendo lo stesso indirizzo nello stesso browser ritrovi i tentativi inviati o, a sfida conclusa, il risultato definitivo. Ogni browser conserva i propri progressi.
 
+## Provare tre partite da StrikerAPI
+
+Inserisci la chiave dopo `STRIKERAPI_KEY=` nel file privato `.env` nella radice del progetto. Se il file manca, crealo con permessi `600`. Git lo ignora. Avvia l’importazione con Python 3 da un terminale con accesso alla rete.
+
+```sh
+python3 scripts/import_matches.py
+```
+
+Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con la sola chiave tramite `--key-file`. Parte da Lazio–Inter (2002), Milan–Inter (2009) e Napoli–Fiorentina (2023). Se una formazione è incompleta, prova le partite successive del campione fino a salvare tre risposte valide. I JSON originali finiscono in `src/strikerapi/`, esclusa da Git. La build include i dati importati nel JavaScript inviato al browser.
+
+L’app mostra le partite importate e propone di indovinare la squadra ospite in ciascuna. Se la cartella è vuota si apre il derby dimostrativo. La demo resta accessibile su `/?partita=demo`.
+
 ## Verifiche
 
 ```sh
