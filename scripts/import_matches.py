@@ -18,19 +18,7 @@ from zoneinfo import ZoneInfo
 REPO = Path(__file__).resolve().parents[1]
 OUTPUT = REPO / 'src' / 'strikerapi'
 CALENDAR = REPO / 'src' / 'calendar.json'
-NAME_OVERRIDES = REPO / 'src' / 'strikerapi-name-overrides.json'
 ENV_FILE = REPO / '.env'
-SAMPLES = (
-    (2009, '2009-08-29', 'MIL', 'INT', (0, 4)),
-    (2022, '2023-01-13', 'NAP', 'JUV', (5, 1)),
-    (2022, '2023-04-23', 'JUV', 'NAP', (0, 1)),
-    (2022, '2023-05-07', 'NAP', 'FIO', (1, 0)),
-    (2023, '2023-09-16', 'INT', 'MIL', (5, 1)),
-    (2023, '2023-11-26', 'JUV', 'INT', (1, 1)),
-    (2023, '2024-02-10', 'ROMA', 'INT', (2, 4)),
-    (2023, '2024-04-22', 'MIL', 'INT', (1, 2)),
-    (2024, '2024-10-27', 'INT', 'JUV', (4, 4)),
-)
 
 
 def request_data(tool, key, **params):
@@ -40,7 +28,7 @@ def request_data(tool, key, **params):
         headers={'Content-Type': 'application/json'},
     )
     request.add_unredirected_header('X-API-Key', key)
-    attempts = 1 if tool == 'search_players' else 2
+    attempts = 2
     for attempt in range(attempts):
         try:
             with urlopen(request, timeout=20) as response:
@@ -113,91 +101,6 @@ def save_response(path, raw_response):
             temporary_path.unlink(missing_ok=True)
 
 
-def cache_short_names(match, key, searched):
-    away_id = match['game']['away']['team_id']
-    lineup = next(team for team in match['lineups'] if team['team_id'] == away_id)
-    overrides = json.loads(NAME_OVERRIDES.read_bytes())
-    saved = 0
-    for player in lineup['starting_xi']:
-        player_id = str(player['player_id'])
-        override = overrides.get(player_id)
-        if override and override.get('team_id', away_id) == away_id:
-            continue
-        path = OUTPUT / 'short-names' / f'{quote(player_id, safe="")}.json'
-        if player_id in searched or path.is_file():
-            continue
-        searched.add(player_id)
-        try:
-            profiles = json.loads(request_data('search_players', key, name=player['name'], limit=15))['data']['players']
-            profile = next((item for item in profiles if str(item['player_id']) == player_id), {})
-            short_name = profile.get('short_name')
-            if isinstance(short_name, str) and short_name.strip():
-                cached = {'player_id': player_id, 'short_name': short_name.strip()}
-                save_response(path, json.dumps(cached, ensure_ascii=False).encode())
-                saved += 1
-        except (ValueError, KeyError, TypeError, RuntimeError, OSError) as error:
-            print(f'Nome breve non recuperato per {player["name"]}: {error}')
-    return saved
-
-
-def hex_color(value):
-    if isinstance(value, str) and re.fullmatch(r'#?[0-9a-fA-F]{6}', value.strip()):
-        return f'#{value.strip().lstrip("#").lower()}'
-
-
-def has_team_colors(path, team_id):
-    try:
-        palette = json.loads(path.read_bytes())
-    except (ValueError, OSError):
-        return False
-    if not isinstance(palette, dict) or palette.get('team_id') != team_id:
-        return False
-    color = palette.get('color')
-    return isinstance(color, str) and color == hex_color(color)
-
-
-def cache_team_colors(team_id, season, key, requested_seasons):
-    directory = OUTPUT / 'team-colors'
-    team_path = directory / f'{quote(team_id, safe="")}.json'
-    if season in requested_seasons or has_team_colors(team_path, team_id):
-        return 0
-
-    requested_seasons.add(season)
-    try:
-        teams = json.loads(request_data('list_teams', key, season=season))['data']['teams']
-        if not isinstance(teams, list):
-            raise ValueError('elenco delle squadre non valido')
-    except (ValueError, KeyError, TypeError, RuntimeError) as error:
-        print(f'Colori non recuperati per la stagione {season}: {error}')
-        return 0
-
-    saved = 0
-    for team in teams:
-        if not isinstance(team, dict):
-            continue
-        listed_id = team.get('team_id')
-        color = hex_color(team.get('color'))
-        if not isinstance(listed_id, str) or not listed_id.strip() or color is None:
-            continue
-        path = directory / f'{quote(listed_id, safe="")}.json'
-        if has_team_colors(path, listed_id):
-            continue
-
-        palette = {'team_id': listed_id, 'color': color}
-        for field in ('alt_color', 'text_color'):
-            if optional_color := hex_color(team.get(field)):
-                palette[field] = optional_color
-        try:
-            save_response(path, json.dumps(palette).encode())
-            saved += 1
-        except OSError as error:
-            print(f'Colori non salvati per la squadra {listed_id}: {error}')
-
-    if not has_team_colors(team_path, team_id):
-        print(f'Colori non disponibili per la squadra {team_id} nella stagione {season}.')
-    return saved
-
-
 def fetch_calendar_match(key, game_id, fixture=None):
     match = json.loads(request_data('get_lineups', key, game_id=game_id))['data']
     game = match['game']
@@ -229,7 +132,7 @@ def fill_calendar(key, today):
     calendar = json.loads(CALENDAR.read_bytes())
     available = {json.loads(path.read_bytes())['data']['game']['game_id']
                  for path in OUTPUT.glob('*.json')}
-    days = [(today + timedelta(days=offset)).isoformat() for offset in range(-7, 8)]
+    days = [(today + timedelta(days=offset)).isoformat() for offset in range(-7, 9)]
     missing_days = deque(day for day in days if day not in calendar)
     missing_ids = {calendar[day] for day in days if day in calendar} - available
     matches = {game_id: fetch_calendar_match(key, game_id) for game_id in sorted(missing_ids)}
@@ -267,9 +170,8 @@ def fill_calendar(key, today):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Importa le partite del calendario da StrikerAPI.')
+    parser = argparse.ArgumentParser(description='Completa il calendario da oggi −7 a oggi +8 con StrikerAPI.')
     parser.add_argument('--key-file', type=Path, help='File privato contenente la chiave StrikerAPI')
-    parser.add_argument('--fill-calendar', action='store_true', help='Completa il calendario da oggi −7 a oggi +7')
     args = parser.parse_args()
     try:
         key = args.key_file.expanduser().read_text().strip() if args.key_file else os.environ.get('STRIKERAPI_KEY', '').strip()
@@ -281,41 +183,11 @@ def main():
     if not key or any(character.isspace() for character in key):
         parser.error(f'compila STRIKERAPI_KEY in {ENV_FILE.name}, impostala nell’ambiente o usa --key-file')
 
-    if args.fill_calendar:
-        try:
-            fill_calendar(key, datetime.now(ZoneInfo('Europe/Rome')).date())
-        except (KeyError, TypeError, ValueError, RuntimeError, OSError) as error:
-            parser.exit(1, f'Importazione calendario fallita: {error}\n')
-        return 0
-
-    saved = 0
-    searched = set()
-    requested_seasons = set()
-    for season, day, home, away, score in SAMPLES:
-        print(f'{day} {home}–{away}: richiesta a StrikerAPI…', flush=True)
-        try:
-            games = json.loads(request_data('list_games', key, season=season, date=day, status='final'))['data']['games']
-            fixture = next((game for game in games if game['home']['abbrev'] == home and game['away']['abbrev'] == away), None)
-            if fixture is None:
-                raise ValueError('incontro assente nella risposta')
-            raw_response = request_data('get_lineups', key, game_id=fixture['game_id'])
-            match = json.loads(raw_response)['data']
-            validate_match(match, fixture['game_id'], day, score)
-        except (ValueError, KeyError, TypeError, RuntimeError) as error:
-            print(f'{day} {home}–{away}: {error}')
-            continue
-
-        path = OUTPUT / f'{day}.json'
-        save_response(path, raw_response)
-        new_palettes = cache_team_colors(match['game']['away']['team_id'], season, key, requested_seasons)
-        new_names = cache_short_names(match, key, searched)
-        print(f'{path.relative_to(OUTPUT.parents[1])} · {new_names} nuovi nomi brevi')
-        if new_palettes:
-            print(f'{new_palettes} nuove palette salvate.')
-        saved += 1
-
-    print(f'{saved}/{len(SAMPLES)} risposte StrikerAPI salvate.')
-    return int(saved != len(SAMPLES))
+    try:
+        fill_calendar(key, datetime.now(ZoneInfo('Europe/Rome')).date())
+    except (KeyError, TypeError, ValueError, RuntimeError, OSError) as error:
+        parser.exit(1, f'Importazione calendario fallita: {error}\n')
+    return 0
 
 
 if __name__ == '__main__':

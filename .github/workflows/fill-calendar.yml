@@ -1,6 +1,9 @@
 name: Calendario sfide
 
 on:
+  schedule:
+    - cron: '0 3 * * 6'
+      timezone: 'Europe/Rome'
   workflow_dispatch:
     inputs:
       publish:
@@ -17,25 +20,27 @@ concurrency:
 jobs:
   fill-calendar:
     runs-on: ubuntu-latest
+    env:
+      PUBLISH_CALENDAR: ${{ github.event_name == 'schedule' || inputs.publish == true }}
     steps:
       - name: Verifica il branch di pubblicazione
-        if: inputs.publish && github.ref != 'refs/heads/main'
+        if: env.PUBLISH_CALENDAR == 'true' && github.ref != 'refs/heads/main'
         run: |
           echo "Seleziona main per pubblicare in produzione." >&2
           exit 1
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.ref }}
-          persist-credentials: ${{ inputs.publish }}
+          persist-credentials: ${{ env.PUBLISH_CALENDAR == 'true' }}
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Completa il calendario
         env:
           STRIKERAPI_KEY: ${{ secrets.STRIKERAPI_KEY }}
-        run: python3 scripts/import_matches.py --fill-calendar
+        run: python3 scripts/import_matches.py
       - name: Salva il risultato del test
-        if: '!inputs.publish'
+        if: env.PUBLISH_CALENDAR != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: calendario-sfide-test
@@ -44,7 +49,7 @@ jobs:
             src/strikerapi/game-*.json
           if-no-files-found: error
       - name: Conserva calendario e formazioni su GitHub
-        if: inputs.publish
+        if: env.PUBLISH_CALENDAR == 'true'
         run: |
           git add -- src/calendar.json ':(glob)src/strikerapi/game-*.json'
           if ! git diff --cached --quiet; then
