@@ -5,15 +5,19 @@ import re
 import socket
 import ssl
 import unicodedata
+from collections import deque
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+from zoneinfo import ZoneInfo
 
 
 REPO = Path(__file__).resolve().parents[1]
 OUTPUT = REPO / 'src' / 'strikerapi'
+CALENDAR = REPO / 'src' / 'calendar.json'
 NAME_OVERRIDES = REPO / 'src' / 'strikerapi-name-overrides.json'
 ENV_FILE = REPO / '.env'
 SAMPLES = (
@@ -194,9 +198,78 @@ def cache_team_colors(team_id, season, key, requested_seasons):
     return saved
 
 
+def fetch_calendar_match(key, game_id, fixture=None):
+    match = json.loads(request_data('get_lineups', key, game_id=game_id))['data']
+    game = match['game']
+    if game['status'] != 'final':
+        raise ValueError('partita non conclusa')
+    expected = game if fixture is None else fixture
+    score = expected['home']['score'], expected['away']['score']
+    if any(type(goals) is not int or goals < 0 for goals in score):
+        raise ValueError('risultato mancante o non valido')
+    date.fromisoformat(expected['date'])
+    validate_match(match, game_id, expected['date'], score)
+
+    teams = {side: {field: game[side][field] for field in ('team_id', 'name', 'score')}
+             for side in ('home', 'away')}
+    lineup = next(team for team in match['lineups'] if team['team_id'] == teams['away']['team_id'])
+    player_fields = ('player_id', 'name', 'jersey', 'position', 'formation_place', 'goals')
+    return {'data': {
+        'game': {'game_id': game_id, 'date': game['date'], **teams},
+        'lineups': [{
+            'team_id': lineup['team_id'],
+            'formation': lineup['formation'],
+            'starting_xi': [{field: player.get(field) for field in player_fields}
+                            for player in lineup['starting_xi']],
+        }],
+    }}
+
+
+def fill_calendar(key, today):
+    calendar = json.loads(CALENDAR.read_bytes())
+    available = {json.loads(path.read_bytes())['data']['game']['game_id']
+                 for path in OUTPUT.glob('*.json')}
+    days = [(today + timedelta(days=offset)).isoformat() for offset in range(-7, 8)]
+    missing_days = deque(day for day in days if day not in calendar)
+    missing_ids = {calendar[day] for day in days if day in calendar} - available
+    matches = {game_id: fetch_calendar_match(key, game_id) for game_id in sorted(missing_ids)}
+    new_dates = len(missing_days)
+
+    if missing_days:
+        used = set(calendar.values())
+        # shortcut: il test pesca dalle ultime 50 partite della Serie A 2024–25, ampliare per la rotazione in produzione.
+        games = json.loads(request_data('list_games', key, season=2024, status='final', limit=50))['data']['games']
+        for fixture in games:
+            game_id = fixture['game_id']
+            if game_id in used:
+                continue
+            if game_id not in available:
+                try:
+                    matches[game_id] = fetch_calendar_match(key, game_id, fixture)
+                except (KeyError, TypeError, ValueError) as error:
+                    print(f'Partita {game_id} scartata: {error}')
+                    continue
+            day = missing_days.popleft()
+            calendar[day] = game_id
+            used.add(game_id)
+            print(f'{day}: assegnata la partita {game_id}')
+            if not missing_days:
+                break
+
+    if missing_days:
+        raise ValueError(f'partite valide insufficienti per {", ".join(missing_days)}')
+    for game_id, match in matches.items():
+        path = OUTPUT / f'game-{quote(game_id, safe="")}.json'
+        save_response(path, json.dumps(match, ensure_ascii=False).encode())
+    if new_dates:
+        save_response(CALENDAR, (json.dumps(calendar, indent=2, sort_keys=True) + '\n').encode())
+    print(f'{days[0]} – {days[-1]}: {len(days)} sfide pronte, {new_dates} date aggiunte, {len(matches)} formazioni scaricate.')
+
+
 def main():
-    parser = argparse.ArgumentParser(description='Importa le partite del calendario nel formato originale di StrikerAPI.')
+    parser = argparse.ArgumentParser(description='Importa le partite del calendario da StrikerAPI.')
     parser.add_argument('--key-file', type=Path, help='File privato contenente la chiave StrikerAPI')
+    parser.add_argument('--fill-calendar', action='store_true', help='Completa il calendario da oggi −7 a oggi +7')
     args = parser.parse_args()
     try:
         key = args.key_file.expanduser().read_text().strip() if args.key_file else os.environ.get('STRIKERAPI_KEY', '').strip()
@@ -207,6 +280,13 @@ def main():
         parser.error('impossibile leggere il file della chiave')
     if not key or any(character.isspace() for character in key):
         parser.error(f'compila STRIKERAPI_KEY in {ENV_FILE.name}, impostala nell’ambiente o usa --key-file')
+
+    if args.fill_calendar:
+        try:
+            fill_calendar(key, datetime.now(ZoneInfo('Europe/Rome')).date())
+        except (KeyError, TypeError, ValueError, RuntimeError, OSError) as error:
+            parser.exit(1, f'Importazione calendario fallita: {error}\n')
+        return 0
 
     saved = 0
     searched = set()

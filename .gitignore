@@ -2,5 +2,7 @@ node_modules/
 dist/
 test-results/
 playwright-report/
-src/strikerapi/
+src/strikerapi/*
+!src/strikerapi/game-*.json
 /.env
+/.vercel/

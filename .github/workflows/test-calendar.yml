@@ -1,0 +1,55 @@
+name: Calendario sfide
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Aggiorna il calendario e le formazioni su main
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: calendar-${{ github.ref }}
+
+jobs:
+  fill-calendar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verifica il branch di pubblicazione
+        if: inputs.publish && github.ref != 'refs/heads/main'
+        run: |
+          echo "Seleziona main per pubblicare in produzione." >&2
+          exit 1
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: ${{ inputs.publish }}
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Completa il calendario
+        env:
+          STRIKERAPI_KEY: ${{ secrets.STRIKERAPI_KEY }}
+        run: python3 scripts/import_matches.py --fill-calendar
+      - name: Salva il risultato del test
+        if: '!inputs.publish'
+        uses: actions/upload-artifact@v7
+        with:
+          name: calendario-sfide-test
+          path: |
+            src/calendar.json
+            src/strikerapi/game-*.json
+          if-no-files-found: error
+      - name: Conserva calendario e formazioni su GitHub
+        if: inputs.publish
+        run: |
+          git add -- src/calendar.json ':(glob)src/strikerapi/game-*.json'
+          if ! git diff --cached --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "Update daily challenge calendar"
+          fi
+          git push origin HEAD:refs/heads/main

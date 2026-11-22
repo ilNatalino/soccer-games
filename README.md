@@ -31,7 +31,7 @@ Inserisci la chiave dopo `STRIKERAPI_KEY=` nel file privato `.env` nella radice 
 python3 scripts/import_matches.py
 ```
 
-Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con la sola chiave tramite `--key-file`. Importa le partite del primo calendario. I JSON originali finiscono in `src/strikerapi/`, esclusa da Git. La build include i dati importati nel JavaScript inviato al browser.
+Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con la sola chiave tramite `--key-file`. Importa le partite del primo calendario. I JSON originali finiscono in `src/strikerapi/` e sono esclusi da Git. La build include i dati importati nel JavaScript inviato al browser.
 
 Quando la palette della squadra da indovinare manca dalla cache, l’importatore chiede a `list_teams` le squadre della stagione e salva le palette disponibili per `team_id` in `src/strikerapi/team-colors/`. Le importazioni successive riusano i colori salvati.
 
@@ -46,6 +46,15 @@ Le [correzioni dei nomi](src/strikerapi-name-overrides.json) sono indicizzate pe
 La pagina principale apre la sfida di oggi e mostra anche i sette giorni precedenti, secondo il fuso italiano. Una data senza una partita importata mostra «Sfida non disponibile».
 
 In [src/calendar.json](src/calendar.json) associa una data di pubblicazione `AAAA-MM-GG` al `data.game.game_id` di una partita importata. Scegli una partita diversa per ogni data e prepara più giorni prima della prossima build. Il primo calendario copre il 15–23 novembre 2026. Per importare altre partite, aggiungile all’elenco in [scripts/import_matches.py](scripts/import_matches.py) e riesegui lo script.
+
+### Provare e pubblicare il calendario da GitHub
+
+1. Aggiungi `STRIKERAPI_KEY` come secret del repository in **Settings → Secrets and variables → Actions**.
+2. Quando [il workflow](.github/workflows/test-calendar.yml) è su `main`, apri **Actions → Calendario sfide → Run workflow**.
+3. Per la prova lascia `publish` disattivato. Scarica il risultato da **Artifacts → calendario-sfide-test**.
+4. Per provare la pubblicazione, avvia il workflow da `main` con `publish` attivato. Controlla se su `main` compare il commit `Update daily challenge calendar` e cerca il deploy associato nella scheda **Deployments** di Vercel. Il progetto Vercel deve essere collegato al repository con `main` come branch di produzione. [Deploy da Git su Vercel](https://vercel.com/docs/git)
+
+Il workflow copre i sette giorni precedenti, oggi e i sette giorni successivi in `Europe/Rome`. Mantiene gli abbinamenti già presenti, recupera le relative formazioni se mancano e usa partite concluse di Serie A 2024–25 per le date libere. In modalità pubblicazione committa e pusha su `main` solo le modifiche al calendario e ai JSON `game-*.json`. Il push richiede che il token di GitHub Actions possa scrivere sul branch. Vercel gestisce build e deploy tramite l’integrazione Git.
 
 ## Verifiche
 
