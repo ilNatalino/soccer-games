@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from scripts import import_matches
 
@@ -13,7 +14,12 @@ class CalendarImportTests(unittest.TestCase):
         today = date(2026, 11, 22)
         original = {'2026-11-14': '103', '2026-11-15': '101', '2026-11-22': '102'}
         new_ids = [str(number) for number in range(105, 119)]
-        candidates = ['101', '103', '104', *new_ids]
+        historic_ids = new_ids[:7]
+        pages = {
+            (2001, 0): (['101', '104'], 50),
+            (2001, 50): (historic_ids, None),
+            (2026, 0): (['103', *new_ids[7:]], None),
+        }
         starters = [
             {'player_id': str(number), 'name': f'Player {number}', 'jersey': str(number),
              'formation_place': number, 'goals': 0, 'assists': 0}
@@ -21,8 +27,9 @@ class CalendarImportTests(unittest.TestCase):
         ]
 
         def game(game_id):
+            played_on = '2001-12-09' if game_id in {'101', '104', *historic_ids} else '2026-09-13'
             return {
-                'game_id': game_id, 'date': '2025-05-25', 'status': 'final',
+                'game_id': game_id, 'date': played_on, 'status': 'final',
                 'home': {'team_id': 'home', 'name': 'Home', 'score': 0},
                 'away': {'team_id': 'away', 'name': 'Away', 'score': 0},
             }
@@ -35,7 +42,10 @@ class CalendarImportTests(unittest.TestCase):
 
         def request(tool, key, **params):
             if tool == 'list_games':
-                return json.dumps({'data': {'games': [game(game_id) for game_id in candidates]}})
+                self.assertIn(params['season'], range(2001, 2027))
+                self.assertEqual(params['status'], 'final')
+                ids, offset = pages.get((params['season'], params['offset']), ([], None))
+                return json.dumps({'data': {'games': [game(game_id) for game_id in ids], 'next_offset': offset}})
             self.assertEqual(tool, 'get_lineups')
             self.assertNotIn(params['game_id'], {'101', '103'})
             return json.dumps(match(params['game_id']))
@@ -44,7 +54,7 @@ class CalendarImportTests(unittest.TestCase):
             calendar = Path(directory) / 'calendar.json'
             output = Path(directory) / 'strikerapi'
             output.mkdir()
-            cached = output / '2025-05-25.json'
+            cached = output / '2001-12-09.json'
             cached.write_text(json.dumps(match('101')))
             calendar.write_text(json.dumps(original))
 
@@ -57,16 +67,24 @@ class CalendarImportTests(unittest.TestCase):
                         (today + timedelta(days=offset)).isoformat() for offset in range(-8, 9)
                     })
                     self.assertEqual(set(result.values()), {'101', '102', '103', *new_ids})
+                    api.assert_any_call('list_games', 'key', season=2001, status='final', limit=50, offset=50)
                     self.assertTrue((output / 'game-102.json').is_file())
                     self.assertFalse((output / 'game-104.json').exists())
                     self.assertEqual(json.loads(cached.read_bytes()), match('101'))
                     downloaded = json.loads((output / 'game-105.json').read_bytes())['data']
+                    self.assertEqual(downloaded['game']['date'], '2001-12-09')
                     self.assertNotIn('assists', downloaded['lineups'][0]['starting_xi'][0])
 
                     api.reset_mock()
                     import_matches.fill_calendar('key', today)
                     api.assert_not_called()
                     self.assertEqual(json.loads(calendar.read_bytes()), result)
+
+    def test_missing_lineup_is_treated_as_an_invalid_match(self):
+        error = HTTPError('https://mcp.strikerapi.com/', 404, 'Not Found', {}, None)
+        with patch.object(import_matches, 'urlopen', side_effect=error):
+            with self.assertRaisesRegex(ValueError, 'formazione non disponibile'):
+                import_matches.fetch_calendar_match('key', '42')
 
     def test_runs_calendar_import_without_flags(self):
         today = date(2026, 11, 22)

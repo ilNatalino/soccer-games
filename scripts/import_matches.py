@@ -8,6 +8,7 @@ import unicodedata
 from collections import deque
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from random import Random
 from tempfile import NamedTemporaryFile
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -19,6 +20,7 @@ REPO = Path(__file__).resolve().parents[1]
 OUTPUT = REPO / 'src' / 'strikerapi'
 CALENDAR = REPO / 'src' / 'calendar.json'
 ENV_FILE = REPO / '.env'
+FIRST_SERIE_A_SEASON = 2001
 
 
 def request_data(tool, key, **params):
@@ -34,6 +36,8 @@ def request_data(tool, key, **params):
             with urlopen(request, timeout=20) as response:
                 return response.read()
         except HTTPError as error:
+            if tool == 'get_lineups' and error.code == 404:
+                raise ValueError('formazione non disponibile') from None
             raise RuntimeError(f'StrikerAPI: HTTP {error.code} per {tool}.') from None
         except (URLError, TimeoutError, socket.timeout) as error:
             reason = error.reason if isinstance(error, URLError) else error
@@ -83,7 +87,7 @@ def validate_match(match, game_id, day, score):
             raise ValueError('dato sui gol mancante o non valido')
         jerseys.add(int(jersey))
 
-    if day == '2009-08-29':
+    if game_id == '278524':
         scorers = {int(player['jersey']) for player in starters if player['goals'] > 0}
         if scorers != {5, 8, 13, 22}:
             raise ValueError('marcatori del derby discordanti con il referto')
@@ -128,6 +132,30 @@ def fetch_calendar_match(key, game_id, fixture=None):
     }}
 
 
+def season_games(key, season):
+    offset = 0
+    while True:
+        page = json.loads(request_data('list_games', key, season=season, status='final', limit=50, offset=offset))['data']
+        yield from page['games']
+        next_offset = page.get('next_offset')
+        if next_offset is None or next_offset <= offset:
+            return
+        offset = next_offset
+
+
+def calendar_candidates(key, today):
+    current_season = today.year if today.month >= 8 else today.year - 1
+    seasons = list(range(FIRST_SERIE_A_SEASON, current_season + 1))
+    Random(today.toordinal()).shuffle(seasons)
+    candidates = deque(season_games(key, season) for season in seasons)
+    while candidates:
+        games = candidates.popleft()
+        fixture = next(games, None)
+        if fixture is not None:
+            yield fixture
+            candidates.append(games)
+
+
 def fill_calendar(key, today):
     calendar = json.loads(CALENDAR.read_bytes())
     available = {json.loads(path.read_bytes())['data']['game']['game_id']
@@ -140,9 +168,7 @@ def fill_calendar(key, today):
 
     if missing_days:
         used = set(calendar.values())
-        # shortcut: il test pesca dalle ultime 50 partite della Serie A 2024–25, ampliare per la rotazione in produzione.
-        games = json.loads(request_data('list_games', key, season=2024, status='final', limit=50))['data']['games']
-        for fixture in games:
+        for fixture in calendar_candidates(key, today):
             game_id = fixture['game_id']
             if game_id in used:
                 continue
