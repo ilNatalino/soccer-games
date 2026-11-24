@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, reactive, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, reactive, ref, shallowRef, useTemplateRef } from 'vue'
 import { orderStarters, quizPlayerName, teamColors, type StrikerMatch } from './strikerapi'
 import { evaluateGuess } from './wordle'
 
@@ -22,6 +22,7 @@ const maxAttempts = 6
 const progressKey = isDemo
   ? `missing-xi:${game.date}:${quizTeam.name}:v1`
   : `missing-xi:strikerapi:${game.game_id}:${quizTeam.team_id}:v1`
+type ShirtOutcome = 'Indovinato' | 'Rivelato' | ''
 const endedEarly = ref(false)
 const starters = orderStarters(formation.starting_xi)
 let offset = 0
@@ -36,9 +37,12 @@ const lineup = reactive([1, ...formation.formation.split('-').map(Number)].map((
       get answer() { return this.pattern.replaceAll(' ', '') },
       draft: '',
       attempts: [] as string[],
-      get outcome(): 'Indovinato' | 'Rivelato' | '' {
+      get outcome(): ShirtOutcome {
         if (this.attempts.includes(this.answer)) return 'Indovinato'
         return endedEarly.value || this.attempts.length === maxAttempts ? 'Rivelato' : ''
+      },
+      get visibleOutcome(): ShirtOutcome {
+        return revealing.value?.shirt === this ? '' : this.outcome
       },
     }
   })
@@ -55,16 +59,20 @@ const shirts = lineup.flatMap(line => line.players)
 const remaining = computed(() => shirts.filter(shirt => !shirt.outcome).length)
 const guessedCount = computed(() => shirts.filter(shirt => shirt.outcome === 'Indovinato').length)
 const totalAttempts = computed(() => shirts.reduce((total, shirt) => total + shirt.attempts.length, 0))
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
+const revealing = shallowRef<{ shirt: Shirt; row: number; stagger: number } | null>(null)
+const celebrating = shallowRef<Shirt | null>(null)
 
 let lastSnapshot: string | null = null
 const selected = ref<Shirt | null>(restoreProgress() ?? null)
 const started = ref(lastSnapshot !== null)
 const phase = computed(() => {
   if (!started.value) return 'ready'
-  return remaining.value === 0 ? 'finished' : 'playing'
+  return remaining.value === 0 && !revealing.value ? 'finished' : 'playing'
 })
 const finished = computed(() => phase.value === 'finished')
 const guessInput = useTemplateRef<HTMLInputElement>('guessInput')
+const guessGrid = useTemplateRef<HTMLDivElement>('guessGrid')
 const pitch = useTemplateRef<HTMLDivElement>('pitch')
 const finishDialog = useTemplateRef<HTMLDialogElement>('finishDialog')
 const scoreHeading = useTemplateRef<HTMLHeadingElement>('scoreHeading')
@@ -77,7 +85,7 @@ const rows = computed(() => {
     const attempt = shirt.attempts[row]
     const feedback = attempt ? evaluateGuess(shirt.answer, attempt) : []
     const text = attempt ?? (row === shirt.attempts.length ? shirt.draft : '')
-    return positions.map(cell => cell === null ? null : { letter: text[cell], feedback: feedback[cell] })
+    return positions.map(cell => cell === null ? null : { index: cell, letter: text[cell], feedback: feedback[cell] })
   })
 })
 const canSubmit = computed(() => {
@@ -102,7 +110,7 @@ function attemptLabel(count: number) {
 function shirtDescription(shirt: Shirt) {
   const details = []
   if (shirt.player.goals > 0) details.push('Marcatore')
-  if (shirt.outcome) details.push(attemptLabel(shirt.attempts.length))
+  if (shirt.visibleOutcome) details.push(attemptLabel(shirt.attempts.length))
   return details.join(', ') || undefined
 }
 
@@ -132,6 +140,8 @@ function restoreProgress() {
     })
     if (!restored.every(entry => entry !== undefined)) return
 
+    revealing.value = null
+    celebrating.value = null
     for (const { shirt, guesses, name, pattern } of restored) {
       if (shirt.name !== name) shirt.draft = ''
       shirt.name = name
@@ -164,7 +174,7 @@ function saveProgress() {
 
 function editGuess(event: Event) {
   const shirt = selected.value
-  if (!shirt) return
+  if (!shirt || shirt.outcome) return
   const input = event.target as HTMLInputElement
   const cursor = letters(input.value.slice(0, input.selectionStart ?? input.value.length)).length
   shirt.draft = letters(input.value).slice(0, shirt.answer.length)
@@ -176,7 +186,7 @@ async function focusGame() {
   await nextTick()
   if (finished.value) scoreHeading.value?.focus()
   else if (!selected.value) pitch.value?.querySelector<HTMLButtonElement>('button.player')?.focus()
-  else if (selected.value.outcome) pitch.value?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus()
+  else if (selected.value.visibleOutcome) pitch.value?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus()
   else guessInput.value?.focus()
 }
 
@@ -189,15 +199,56 @@ function startGame() {
 function submitGuess() {
   restoreProgress()
   const shirt = selected.value
-  if (finished.value || shirt?.outcome) return focusGame()
+  if (remaining.value === 0 || shirt?.outcome) {
+    if (!revealing.value) return focusGame()
+    return
+  }
   if (!shirt || !canSubmit.value) return
+  celebrating.value = null
   shirt.attempts.push(shirt.draft)
   shirt.draft = ''
   saveProgress()
-  return focusGame()
+  if (reducedMotion.matches) {
+    revealing.value = null
+    return focusGame()
+  }
+  return revealFeedback(shirt)
+}
+
+async function revealFeedback(shirt: Shirt) {
+  const attempt = {
+    shirt,
+    row: shirt.attempts.length - 1,
+    stagger: Math.min(32, 270 / Math.max(1, shirt.answer.length - 1)),
+  }
+  revealing.value = attempt
+  if (!shirt.outcome) await focusGame()
+  else await nextTick()
+  if (revealing.value !== attempt) return
+
+  const row = guessGrid.value?.children[attempt.row]
+  row?.scrollIntoView({ block: 'nearest' })
+  const animations = row?.getAnimations({ subtree: true }) ?? []
+  await Promise.allSettled(animations.map(animation => animation.finished))
+  if (revealing.value !== attempt) return
+  finishReveal()
+  if (!shirt.outcome) return
+
+  const active = document.activeElement
+  if (finished.value || active === document.body || (active && guessInput.value?.form?.contains(active))) {
+    return focusGame()
+  }
+}
+
+function finishReveal() {
+  const shirt = revealing.value?.shirt
+  revealing.value = null
+  if (shirt?.outcome === 'Indovinato' && !reducedMotion.matches) celebrating.value = shirt
 }
 
 function selectShirt(shirt: Shirt) {
+  if (remaining.value === 0) return
+  if (selected.value !== shirt) finishReveal()
   selected.value = shirt
   return focusGame()
 }
@@ -210,6 +261,8 @@ function openFinishDialog(event: MouseEvent) {
 
 function finishEarly() {
   finishDialog.value?.close()
+  revealing.value = null
+  celebrating.value = null
   restoreProgress()
   if (!finished.value) {
     endedEarly.value = true
@@ -252,13 +305,15 @@ function finishEarly() {
             :key="shirt.player.player_id"
             :is="finished ? 'div' : 'button'"
             :type="finished ? undefined : 'button'"
+            :disabled="!finished && remaining === 0"
             class="player"
-            :class="{ selected: !finished && selected === shirt, resolved: shirt.outcome }"
-            :aria-label="finished ? undefined : (shirt.outcome ? `Maglia ${shirt.player.jersey}, ${shirt.name}, ${shirt.outcome}` : `Maglia ${shirt.player.jersey}, ${line.role}`)"
+            :class="{ selected: !finished && selected === shirt, resolved: shirt.visibleOutcome, celebrating: celebrating === shirt }"
+            :aria-label="finished ? undefined : (shirt.visibleOutcome ? `Maglia ${shirt.player.jersey}, ${shirt.name}, ${shirt.visibleOutcome}` : `Maglia ${shirt.player.jersey}, ${line.role}`)"
             :aria-description="finished ? undefined : shirtDescription(shirt)"
             :aria-pressed="finished ? undefined : selected === shirt"
             :aria-controls="finished ? undefined : 'guess-panel'"
             @click="!finished && selectShirt(shirt)"
+            @animationend.self="celebrating === shirt && (celebrating = null)"
           >
             <span class="shirt-icon">
               <span
@@ -270,8 +325,8 @@ function finishEarly() {
               <span v-if="shirt.player.goals > 0" class="scorer-icon" role="img" aria-label="Marcatore" :aria-hidden="!finished">⚽</span>
             </span>
             <span class="player-caption">
-              <span>{{ shirt.outcome ? shirt.name : '· · ·' }}</span>
-              <span v-if="shirt.outcome" class="player-attempts" :title="attemptLabel(shirt.attempts.length)" aria-hidden="true">{{ shirt.attempts.length }}</span>
+              <span>{{ shirt.visibleOutcome ? shirt.name : '· · ·' }}</span>
+              <span v-if="shirt.visibleOutcome" class="player-attempts" :title="attemptLabel(shirt.attempts.length)" aria-hidden="true">{{ shirt.attempts.length }}</span>
               <span v-if="finished" class="visually-hidden">{{ attemptLabel(shirt.attempts.length) }}</span>
             </span>
           </component>
@@ -281,18 +336,19 @@ function finishEarly() {
 
     <section v-if="phase === 'playing'" id="guess-panel" class="guess-panel" aria-label="Tentativi">
       <form @submit.prevent="submitGuess">
-        <input id="guess" ref="guessInput" :value="selected?.draft ?? ''" :disabled="!selected || Boolean(selected.outcome)" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocapitalize="characters" :spellcheck="false" aria-label="Il tuo tentativo" @input="editGuess" />
+        <input id="guess" ref="guessInput" :value="selected?.draft ?? ''" :disabled="!selected || Boolean(selected.visibleOutcome)" :readonly="Boolean(selected?.outcome)" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocapitalize="characters" :spellcheck="false" aria-label="Il tuo tentativo" @input="editGuess" />
         <button v-if="selected" class="submit" :disabled="!canSubmit">Invia</button>
       </form>
       <template v-if="selected">
-        <div class="guess-grid">
-          <div v-for="(row, index) in rows" :key="index" class="guess-row" role="group" :aria-label="`Tentativo ${index + 1}`">
+        <div :key="selected.player.player_id" ref="guessGrid" class="guess-grid">
+          <div v-for="(row, index) in rows" :key="index" class="guess-row" :class="{ revealing: revealing?.row === index }" role="group" :aria-label="`Tentativo ${index + 1}`">
             <template v-for="(cell, position) in row" :key="position">
               <span v-if="cell === null" class="word-space" role="img" aria-label="Spazio"></span>
               <span
                 v-else
                 class="letter"
                 :class="cell.feedback"
+                :style="revealing?.row === index ? { '--letter-delay': `${cell.index * revealing.stagger}ms` } : undefined"
                 role="img"
                 :aria-label="cell.feedback ? `${cell.letter}: ${feedbackLabels[cell.feedback]}` : (cell.letter ?? 'Casella vuota')"
               >
@@ -304,10 +360,10 @@ function finishEarly() {
         </div>
       </template>
       <p v-else class="intro">Seleziona la maglia sul campo e scrivi il nome. Ogni lettera è un indizio.</p>
-      <button type="button" class="secondary conclude" aria-haspopup="dialog" @click="openFinishDialog">Termina</button>
+      <button type="button" class="secondary conclude" :disabled="remaining === 0" aria-haspopup="dialog" @click="openFinishDialog">Termina</button>
     </section>
   </div>
-  <dialog v-if="phase === 'playing'" ref="finishDialog" class="finish-dialog" aria-labelledby="finish-title">
+  <dialog v-if="phase === 'playing' && remaining > 0" ref="finishDialog" class="finish-dialog" aria-labelledby="finish-title">
     <h2 id="finish-title">{{ remaining === 1 ? 'Vuoi rivelare 1 titolare rimasto?' : `Vuoi rivelare i ${remaining} titolari rimasti?` }}</h2>
     <form method="dialog">
       <button class="secondary" autofocus>Continua a giocare</button>

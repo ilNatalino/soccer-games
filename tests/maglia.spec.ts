@@ -128,6 +128,29 @@ test('si corregge una riga prima di inviarla e le O duplicate ricevono il feedba
   }
 })
 
+test('Invia colora da sinistra a destra il tentativo appena inviato e salta gli spazi', async ({ page }) => {
+  await openDemo(page)
+  await page.getByRole('button', { name: /^Maglia 8,/ }).click()
+  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
+  const row = page.getByRole('group', { name: 'Tentativo 1', exact: true })
+  await input.fill('THIAGO ZZZZZ')
+  expect(await row.evaluate(element => element.getAnimations({ subtree: true }).length)).toBe(0)
+
+  const delays = await row.evaluate(async element => {
+    document.querySelector<HTMLInputElement>('#guess')!.form!.requestSubmit()
+    await new Promise(requestAnimationFrame)
+    return Array.from(element.children, cell => cell.getAnimations()[0]?.effect?.getTiming().delay ?? null)
+  })
+
+  expect(delays[6]).toBeNull()
+  const letters = delays.filter(delay => delay !== null)
+  expect(letters).toHaveLength(11)
+  expect(letters.every((delay, index) => index === 0 || delay > letters[index - 1]!)).toBe(true)
+  expect(letters[6]! - letters[5]!).toBeCloseTo(letters[1]! - letters[0]!, 1)
+  await expect(row.getByRole('img', { name: 'Z: assente' })).toHaveCount(5)
+  await expect(row.getByRole('img', { name: 'Z: assente' }).last()).toHaveCSS('background-color', 'rgb(83, 97, 118)')
+})
+
 test('si sceglie con la tastiera e ETOO chiude la maglia come indovinata', async ({ page }) => {
   await page.goto(demoUrl)
   const start = page.getByRole('button', { name: 'Inizia', exact: true })
@@ -221,8 +244,14 @@ test('cambiare maglia conserva i tentativi e il feedback del titolare precedente
   else await shirt22.click()
   await expect(first.getByLabel('Casella vuota')).toHaveCount(6)
   await input.fill('maicon')
-  if (isMobile) await submit.tap()
-  else await input.press('Enter')
+  const pendingFeedback = await first.evaluate(async row => {
+    document.querySelector<HTMLInputElement>('#guess')!.form!.requestSubmit()
+    await new Promise(requestAnimationFrame)
+    const animations = row.getAnimations({ subtree: true })
+    for (const animation of animations) animation.pause()
+    return animations.length > 0
+  })
+  expect(pendingFeedback).toBe(true)
   await expect(first.getByLabel('M: posizione corretta')).toBeVisible()
   await expect(first.getByLabel('A: assente')).toBeVisible()
 
@@ -236,9 +265,32 @@ test('cambiare maglia conserva i tentativi e il feedback del titolare precedente
   if (isMobile) await shirt22.tap()
   else await shirt22.click()
   await expect(first.getByLabel('M: posizione corretta')).toBeVisible()
+  await expect(first.getByLabel('M: posizione corretta')).toHaveCSS('background-color', 'rgb(40, 100, 77)')
   await expect(first.getByLabel('A: assente')).toBeVisible()
   await expect(input).toBeEnabled()
   await expect(page.getByRole('button', { name: 'Maglia 13, Maicon, Indovinato' })).toBeVisible()
+})
+
+test('chiudere il dialogo durante il feedback lascia il focus su Termina', async ({ page }) => {
+  await openDemo(page)
+  await page.getByRole('button', { name: /^Maglia 9,/ }).click()
+  await page.getByRole('textbox', { name: 'Il tuo tentativo' }).fill('ETOO')
+  const row = page.getByRole('group', { name: 'Tentativo 1', exact: true })
+  await row.evaluate(async element => {
+    document.querySelector<HTMLInputElement>('#guess')!.form!.requestSubmit()
+    await new Promise(requestAnimationFrame)
+    for (const animation of element.getAnimations({ subtree: true })) animation.pause()
+  })
+
+  const conclude = page.getByRole('button', { name: 'Termina', exact: true })
+  await conclude.click()
+  await page.keyboard.press('Escape')
+  await expect(conclude).toBeFocused()
+  await row.evaluate(element => {
+    for (const animation of element.getAnimations({ subtree: true })) animation.finish()
+  })
+  await expect(page.getByRole('button', { name: 'Maglia 9, Eto’o, Indovinato' })).toBeVisible()
+  await expect(conclude).toBeFocused()
 })
 
 const starters = [
@@ -334,11 +386,23 @@ test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato por
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   }
 
-  for (const guess of ['OOOO', 'OTTO', 'ETOO']) {
+  for (const guess of ['OOOO', 'OTTO']) {
     await input.fill(guess)
     if (isMobile) await submit.tap()
     else await input.press('Enter')
   }
+  await input.fill('ETOO')
+  const finalFeedback = await rows.nth(2).evaluate(async row => {
+    document.querySelector<HTMLInputElement>('#guess')!.form!.requestSubmit()
+    await new Promise(requestAnimationFrame)
+    const animations = row.getAnimations({ subtree: true })
+    const playedFinalRow = row.isConnected && animations.length > 0
+    await Promise.allSettled(animations.map(animation => animation.finished))
+    await new Promise(requestAnimationFrame)
+    const accented = Array.from(document.querySelectorAll('.pitch .player')).find(player => player.getAnimations().length > 0)
+    return { playedFinalRow, accentedName: accented?.querySelector('.player-caption span')?.textContent }
+  })
+  expect(finalFeedback).toEqual({ playedFinalRow: true, accentedName: 'Eto’o' })
   await expect(page.getByRole('heading', { name: 'Sfida conclusa' })).toBeFocused()
   await expect(page.getByText('11 su 11 indovinati · 13 tentativi', { exact: true })).toBeVisible()
   await expect(page.locator('.player-attempts')).toHaveCount(11)
@@ -356,6 +420,29 @@ test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato por
   })).toBe(true)
   await expect(page.getByRole('button', { name: /^Maglia / })).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
+
+test('con il movimento ridotto il feedback e il risultato compaiono subito', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  await openDemo(page)
+  for (const { number, answer } of starters.slice(0, -1)) {
+    await playShirt(page, number, [answer])
+  }
+  await playShirt(page, 9, ['OTTO'])
+  const first = page.getByRole('group', { name: 'Tentativo 1', exact: true })
+  await expect(first.getByLabel('T: posizione corretta')).toHaveCSS('background-color', 'rgb(40, 100, 77)')
+  expect(await first.evaluate(row => row.getAnimations({ subtree: true }).length)).toBe(0)
+
+  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
+  await input.fill('ETOO')
+  const followingFrame = await input.evaluate(async element => {
+    element.closest('form')!.requestSubmit()
+    await new Promise(requestAnimationFrame)
+    return { feedbackOpen: element.isConnected, animations: document.getAnimations().length }
+  })
+  expect(followingFrame).toEqual({ feedbackOpen: false, animations: 0 })
+  await expect(page.getByRole('heading', { name: 'Sfida conclusa' })).toBeFocused()
+  await expect(page.getByText('11 su 11 indovinati · 12 tentativi', { exact: true })).toBeVisible()
 })
 
 test('annullare Termina conserva i tentativi e confermare salva il risultato con i quattro titolari rivelati', async ({ page, context, isMobile }) => {
@@ -430,7 +517,15 @@ test('il sesto errore sull’ultima maglia conclude la sfida e il risultato rest
   await expect(dialog).toBeHidden()
   await expect(conclude).toBeFocused()
 
-  await playShirt(page, 9, ['ZZZZ'])
+  const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
+  await input.fill('ZZZZ')
+  const sixth = page.getByRole('group', { name: 'Tentativo 6', exact: true })
+  const playedFinalRow = await sixth.evaluate(async row => {
+    document.querySelector<HTMLInputElement>('#guess')!.form!.requestSubmit()
+    await new Promise(requestAnimationFrame)
+    return row.isConnected && row.getAnimations({ subtree: true }).length > 0
+  })
+  expect(playedFinalRow).toBe(true)
   await expect(page.getByText('10 su 11 indovinati · 16 tentativi', { exact: true })).toBeVisible()
   const etoo = page.locator('.player').filter({ has: page.getByText('Eto’o', { exact: true }) })
   await expect(etoo.locator('.player-attempts')).toHaveText('6')

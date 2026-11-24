@@ -28,5 +28,8 @@ Una risposta completa inviata per la maglia selezionata. Correggere le lettere p
 **Punteggio**:
 Il totale dei tentativi inviati su tutte le maglie. Al termine si legge insieme al numero di titolari indovinati, per esempio «7 su 11 indovinati · 20 tentativi».
 
+**Titolare indovinato**:
+Un titolare identificato con un tentativo corretto sulla sua maglia.
+
 **Titolare rivelato**:
 Un titolare di cui il gioco mostra il nome al sesto errore o alla conclusione anticipata della sfida.

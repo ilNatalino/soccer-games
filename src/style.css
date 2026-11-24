@@ -72,6 +72,10 @@ h1, h2, p { margin: 0; }
 button.player:hover { background: #ffffff18; }
 .player:focus-visible { outline-color: #fff; }
 .player.selected { border-color: #c9e1ff; background: #10233c55; }
+.player.celebrating { animation: celebrate-shirt 200ms ease-out; }
+@keyframes celebrate-shirt {
+  45% { transform: translateY(-3px); background-color: #ffffff24; }
+}
 .shirt-icon { position: relative; }
 .shirt { display: grid; place-items: center; width: 52px; height: 48px; background-color: var(--shirt-color, #536176); color: var(--shirt-number-color, white); clip-path: polygon(24% 0, 36% 0, 42% 9%, 58% 9%, 64% 0, 76% 0, 100% 20%, 85% 42%, 75% 34%, 75% 100%, 25% 100%, 25% 34%, 15% 42%, 0 20%); font-size: 1.1rem; font-weight: 800; text-shadow: 0 1px 2px #000, 0 0 2px #fff; padding-top: 8px; }
 .shirt[data-pattern="stripes"] {
@@ -128,6 +132,26 @@ main:has(> .start-screen) { width: 100%; padding-block: 24px; }
 .correct { color: white; background: #28644d; border-color: #28644d; }
 .present { color: white; background: #8a6013; border-color: #8a6013; }
 .absent { color: white; background: #536176; border-color: #536176; }
+.revealing .letter {
+  animation: reveal-letter-color 130ms step-start var(--letter-delay) backwards,
+    reveal-letter-lift 130ms ease-out var(--letter-delay) backwards;
+}
+.revealing .letter small { animation: reveal-symbol 130ms step-start var(--letter-delay) backwards; }
+@keyframes reveal-letter-color {
+  from { background-color: white; border-color: #d0d8e1; color: #172333; }
+}
+@keyframes reveal-letter-lift {
+  45% { transform: translateY(-2px); }
+}
+@keyframes reveal-symbol {
+  from { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .revealing .letter, .revealing .letter small, .player.celebrating {
+    animation-duration: 1ms;
+    animation-delay: 0ms;
+  }
+}
 input { width: 100%; min-height: 48px; padding: 8px 12px; border: 1px solid #8898ac; border-radius: 4px; font-size: 1.125rem; letter-spacing: .2em; text-transform: uppercase; }
 .submit { width: 100%; min-height: 48px; margin-top: 12px; border: 0; border-radius: 4px; color: white; background: #234e9d; font-weight: 600; }
 .submit:hover:enabled { background: #183d80; }
