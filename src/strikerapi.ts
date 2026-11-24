@@ -14,12 +14,14 @@ export interface StrikerMatch {
     home: StrikerTeam
     away: StrikerTeam
   }
+  quiz_side?: 'home' | 'away'
   lineups: {
     team_id: string
     formation: string
     starting_xi: {
       player_id: string
       name: string
+      short_name?: string | null
       jersey: string
       formation_place: number | null
       position?: string | null
@@ -90,5 +92,6 @@ export function quizPlayerName(teamId: string, player: Starter) {
   const override = nameOverrides.get(playerId)
   if (override && (override.team_id === undefined || override.team_id === teamId)) return override.name
 
-  return shortNames.get(playerId)?.replace(/^\p{L}\p{M}*\.\s+/u, '') || player.name
+  const shortName = player.short_name === undefined ? shortNames.get(playerId) : player.short_name
+  return shortName?.trim().replace(/^\p{L}\p{M}*\.(?:\s+|$)/u, '') || player.name
 }

@@ -1,1 +1,114 @@
-{"data": {"game": {"game_id": "712490", "date": "2025-05-25", "home": {"team_id": "118", "name": "Udinese", "score": 2}, "away": {"team_id": "109", "name": "Fiorentina", "score": 3}}, "lineups": [{"team_id": "109", "formation": "3-5-2", "starting_xi": [{"player_id": "108482", "name": "David de Gea", "jersey": "43", "position": "Goalkeeper", "formation_place": 1, "goals": 0}, {"player_id": "168453", "name": "Dodô", "jersey": "2", "position": "Right Midfielder", "formation_place": 2, "goals": 0}, {"player_id": "198087", "name": "Robin Gosens", "jersey": "21", "position": "Left Midfielder", "formation_place": 3, "goals": 0}, {"player_id": "262481", "name": "Luca Ranieri", "jersey": "6", "position": "Center Left Defender", "formation_place": 4, "goals": 0}, {"player_id": "169219", "name": "Pablo Marí", "jersey": "18", "position": "Center Defender", "formation_place": 5, "goals": 0}, {"player_id": "367168", "name": "Pietro Comuzzo", "jersey": "15", "position": "Center Right Defender", "formation_place": 6, "goals": 1}, {"player_id": "210392", "name": "Rolando Mandragora", "jersey": "8", "position": "Center Right Midfielder", "formation_place": 7, "goals": 0}, {"player_id": "276254", "name": "Nicolò Fagioli", "jersey": "44", "position": "Center Left Midfielder", "formation_place": 8, "goals": 1}, {"player_id": "248633", "name": "Moise Kean", "jersey": "20", "position": "Center Left Forward", "formation_place": 9, "goals": 1}, {"player_id": "280381", "name": "Lucas Beltrán", "jersey": "9", "position": "Center Right Forward", "formation_place": 10, "goals": 0}, {"player_id": "319285", "name": "Amir Richardson", "jersey": "24", "position": "Attacking Midfielder", "formation_place": 11, "goals": 0}]}]}}
+{
+    "data": {
+        "game": {
+            "game_id": "712490",
+            "date": "2025-05-25",
+            "home": {
+                "team_id": "118",
+                "name": "Udinese",
+                "score": 2
+            },
+            "away": {
+                "team_id": "109",
+                "name": "Fiorentina",
+                "score": 3
+            }
+        },
+        "lineups": [
+            {
+                "team_id": "109",
+                "formation": "3-5-2",
+                "starting_xi": [
+                    {
+                        "player_id": "108482",
+                        "name": "David de Gea",
+                        "jersey": "43",
+                        "position": "Goalkeeper",
+                        "formation_place": 1,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "168453",
+                        "name": "Dodô",
+                        "jersey": "2",
+                        "position": "Right Midfielder",
+                        "formation_place": 2,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "198087",
+                        "name": "Robin Gosens",
+                        "jersey": "21",
+                        "position": "Left Midfielder",
+                        "formation_place": 3,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "262481",
+                        "name": "Luca Ranieri",
+                        "jersey": "6",
+                        "position": "Center Left Defender",
+                        "formation_place": 4,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "169219",
+                        "name": "Pablo Marí",
+                        "jersey": "18",
+                        "position": "Center Defender",
+                        "formation_place": 5,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "367168",
+                        "name": "Pietro Comuzzo",
+                        "jersey": "15",
+                        "position": "Center Right Defender",
+                        "formation_place": 6,
+                        "goals": 1
+                    },
+                    {
+                        "player_id": "210392",
+                        "name": "Rolando Mandragora",
+                        "jersey": "8",
+                        "position": "Center Right Midfielder",
+                        "formation_place": 7,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "276254",
+                        "name": "Nicolò Fagioli",
+                        "jersey": "44",
+                        "position": "Center Left Midfielder",
+                        "formation_place": 8,
+                        "goals": 1
+                    },
+                    {
+                        "player_id": "248633",
+                        "name": "Moise Kean",
+                        "jersey": "20",
+                        "position": "Center Left Forward",
+                        "formation_place": 9,
+                        "goals": 1
+                    },
+                    {
+                        "player_id": "280381",
+                        "name": "Lucas Beltrán",
+                        "jersey": "9",
+                        "position": "Center Right Forward",
+                        "formation_place": 10,
+                        "goals": 0
+                    },
+                    {
+                        "player_id": "319285",
+                        "name": "Amir Richardson",
+                        "jersey": "24",
+                        "position": "Attacking Midfielder",
+                        "formation_place": 11,
+                        "goals": 0
+                    }
+                ]
+            }
+        ]
+    }
+}

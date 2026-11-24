@@ -10,7 +10,20 @@ const schedule = {
   '2026-11-23': 'roma',
 }
 const matches = [
-  { ...derby, game: { ...derby.game, game_id: 'milan' } },
+  {
+    ...derby,
+    game: { ...derby.game, game_id: 'milan' },
+    quiz_side: 'home',
+    lineups: [{
+      ...derby.lineups[0],
+      team_id: derby.game.home.team_id,
+      starting_xi: derby.lineups[0].starting_xi.map(player => {
+        if (player.jersey === '22') return { ...player, name: 'Diego Milito', short_name: 'D. Milito' }
+        if (player.jersey === '8') return { ...player, short_name: null }
+        return player
+      }),
+    }],
+  },
   {
     ...derby,
     game: { ...derby.game, game_id: 'roma', home: { ...derby.game.home, name: 'Roma' } },
@@ -42,6 +55,14 @@ test('apre oggi in Italia e ritrova i tentativi passando a un altro giorno', asy
   const calendar = page.getByRole('navigation', { name: 'Calendario delle sfide' })
   const activeDate = calendar.locator('[aria-current="page"] time')
   const dateLinks = calendar.getByRole('link')
+  const field = page.locator('.pitch')
+  const match = page.locator('.match')
+  const start = page.getByRole('button', { name: 'Inizia', exact: true })
+  await expect(calendar).toHaveCount(0)
+  await expect(match).toHaveCount(0)
+  await expect(field).toHaveCount(0)
+  await start.click()
+
   await expect(dateLinks).toHaveCount(8)
   await expect(dateLinks.first()).toHaveText('Oggi')
   const datePositions = await dateLinks.evaluateAll(links => links.map(link => {
@@ -53,9 +74,8 @@ test('apre oggi in Italia e ritrova i tentativi passando a un altro giorno', asy
   await expect(activeDate).toHaveAttribute('datetime', '2026-11-22')
   await expect(calendar.locator('time').last()).toHaveAttribute('datetime', '2026-11-15')
   await expect(page.getByRole('heading', { name: 'Milan 0–4 Inter' })).toBeVisible()
-  await expect(page.locator('.match time')).toHaveAttribute('datetime', '2009-08-29')
+  await expect(match.locator('time')).toHaveAttribute('datetime', '2009-08-29')
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-  const field = page.locator('.pitch')
   const panel = page.getByRole('region', { name: 'Tentativi' })
   const { width, height } = (await field.boundingBox())!
   expect(await panel.boundingBox()).toMatchObject({ width, height })
@@ -69,6 +89,11 @@ test('apre oggi in Italia e ritrova i tentativi passando a un altro giorno', asy
   const yesterday = calendar.locator('a[href="?giorno=2026-11-21"]')
   if (isMobile) await yesterday.tap()
   else await yesterday.click()
+  await expect(calendar).toHaveCount(0)
+  await expect(match).toHaveCount(0)
+  await expect(field).toHaveCount(0)
+  await start.click()
+
   await expect(activeDate).toHaveAttribute('datetime', '2026-11-21')
   await expect(page.getByRole('heading', { name: 'Roma 0–4 Inter' })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Il tuo tentativo' })).toBeDisabled()
@@ -80,16 +105,44 @@ test('apre oggi in Italia e ritrova i tentativi passando a un altro giorno', asy
   await calendar.getByRole('link', { name: 'Oggi' }).click()
   await page.reload()
   await expect(firstAttempt.getByRole('img', { name: 'A: assente' })).toHaveCount(4)
+  await expect(calendar).toBeVisible()
+  await expect(match).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Milan', exact: true })).toBeVisible()
+  await expect(start).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Termina', exact: true }).click()
+  await page.getByRole('button', { name: 'Rivela e concludi', exact: true }).click()
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Sfida conclusa' })).toBeVisible()
+  await expect(calendar).toBeVisible()
+  await expect(start).toHaveCount(0)
+})
+
+test('usa il nome breve senza iniziale e ripiega sul nome della formazione', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-11-22T12:00:00Z'))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Inizia', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Milan', exact: true })).toBeVisible()
+
+  for (const [jersey, guess, name] of [['22', 'MILITO', 'Milito'], ['8', 'THIAGOMOTTA', 'Thiago Motta']]) {
+    await page.getByRole('button', { name: new RegExp(`^Maglia ${jersey},`) }).click()
+    await page.getByRole('textbox', { name: 'Il tuo tentativo' }).fill(guess)
+    await page.getByRole('button', { name: 'Invia', exact: true }).click()
+    await expect(page.getByRole('button', { name: `Maglia ${jersey}, ${name}, Indovinato` })).toBeVisible()
+  }
 })
 
 test('mostra le date senza sfida e limita i link diretti agli otto giorni', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-22T12:00:00Z'))
   await page.goto('/?giorno=2026-11-20')
   await expect(page.getByRole('heading', { name: 'Sfida non disponibile' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Inizia', exact: true })).toHaveCount(0)
   await expect(page.locator('[aria-current="page"] time')).toHaveAttribute('datetime', '2026-11-20')
 
   for (const date of ['2026-11-14', '2026-11-23']) {
     await page.goto(`/?giorno=${date}`)
+    await expect(page.locator('.match')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Inizia', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Milan 0–4 Inter' })).toBeVisible()
     await expect(page.locator('[aria-current="page"] time')).toHaveAttribute('datetime', '2026-11-22')
   }
@@ -101,12 +154,20 @@ test('cambia sfida a mezzanotte italiana anche nel giorno del cambio d’ora', a
   await page.clock.pauseAt(italianMidnight)
   await page.goto('/')
   const activeDate = page.locator('[aria-current="page"] time')
+  const start = page.getByRole('button', { name: 'Inizia', exact: true })
+  await start.press('Enter')
+
   await expect(activeDate).toHaveAttribute('datetime', '2026-10-25')
   await expect(page.getByRole('heading', { name: 'Milan 0–4 Inter' })).toBeVisible()
 
   await page.clock.fastForward(25 * 60 * 60 * 1000 - 1)
   await expect(activeDate).toHaveAttribute('datetime', '2026-10-25')
   await page.clock.runFor(1)
+  await expect(start).toBeVisible()
+  await expect(activeDate).toHaveCount(0)
+  await expect(page.locator('.match')).toHaveCount(0)
+  await expect(page.locator('.pitch')).toHaveCount(0)
+  await start.press('Enter')
   await expect(activeDate).toHaveAttribute('datetime', '2026-10-26')
   await expect(page.getByRole('heading', { name: 'Roma 0–4 Inter' })).toBeVisible()
 })

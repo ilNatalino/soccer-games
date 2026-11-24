@@ -35,7 +35,7 @@ Lo script accetta anche la variabile d’ambiente `STRIKERAPI_KEY` o un file con
 
 Le [palette personalizzate delle maglie](src/team-shirt-overrides.json) hanno la precedenza e sono indicizzate per `team_id`. Ogni voce indica il colore di base (`color`), il colore del numero (`text_color`) ed eventualmente un motivo (`pattern`) e un colore secondario (`accent_color`). Per le altre squadre il gioco usa una palette disponibile in `src/strikerapi/team-colors/` o la maglia neutra.
 
-La griglia usa il nome breve da `src/strikerapi/short-names/` senza l’eventuale iniziale, oppure il nome della formazione quando manca il nome breve.
+Per ogni nuova partita l’importatore sceglie a caso la squadra da indovinare tra casa e trasferta quando entrambe le formazioni sono valide. Se una sola è valida, usa quella. Salva la scelta in `quiz_side` nel JSON della partita e cerca con `search_players` il nome breve dei soli titolari scelti. Riusa i nomi brevi già recuperati per lo stesso `player_id` e li salva nella formazione. La griglia rimuove l’eventuale iniziale puntata e usa il nome della formazione quando manca il nome breve. I JSON precedenti senza `quiz_side` usano la squadra ospite e possono ancora usare i nomi brevi locali in `src/strikerapi/short-names/`.
 
 Le [correzioni dei nomi](src/strikerapi-name-overrides.json) sono indicizzate per `player_id`. Imposta `name` per tutte le partite di un giocatore o aggiungi `team_id` se la correzione vale solo per una squadra. Júlio César è limitato all’Inter perché StrikerAPI gli associa l’ID di Julio César De León. Una correzione applicabile ha la precedenza.
 

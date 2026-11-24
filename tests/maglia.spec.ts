@@ -2,20 +2,61 @@ import { expect, test, type Page } from '@playwright/test'
 
 const demoUrl = '/?partita=demo'
 
-test('il derby mostra undici maglie e permette di aprire la numero 9', async ({ page, isMobile }) => {
+async function openDemo(page: Page) {
+  await page.goto(demoUrl)
+  await page.getByRole('button', { name: 'Inizia', exact: true }).click()
+}
+
+test('il derby mostra logo e Inizia al centro e fa apparire il campo all’avvio', async ({ page, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 320, height: 640 })
   await page.goto(demoUrl)
   const title = page.getByRole('heading', { name: 'Milan 0–4 Inter', exact: true })
   const date = page.getByText('29 agosto 2009', { exact: true })
+  const team = page.getByRole('heading', { name: 'Inter', exact: true })
+  const formation = page.getByText('4-3-1-2', { exact: true })
+  await expect(page).toHaveTitle('Missing XI')
+  await expect(title).toHaveCount(0)
+  await expect(date).toHaveCount(0)
+  await expect(team).toHaveCount(0)
+  await expect(formation).toHaveCount(0)
+
+  const field = page.locator('.pitch')
+  const header = page.getByRole('banner')
+  const startScreen = page.getByRole('region', { name: 'Avvio della sfida' })
+  const start = startScreen.getByRole('button', { name: 'Inizia', exact: true })
+  const shirts = page.getByRole('button', { name: /^Maglia / })
+  await expect(header).toBeVisible()
+  await expect(field).toHaveCount(0)
+  await expect(page.getByRole('textbox')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Termina', exact: true })).toHaveCount(0)
+  await expect(startScreen).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(startScreen).toHaveCSS('border-top-width', '0px')
+  const viewport = page.viewportSize()!
+  const { y, height: headerHeight } = (await header.boundingBox())!
+  const group = (await startScreen.boundingBox())!
+  const logo = (await startScreen.getByRole('heading', { name: 'MISSING XI', exact: true }).boundingBox())!
+  const button = (await start.boundingBox())!
+  expect(Math.abs(group.y + group.height / 2 - (y + headerHeight + viewport.height) / 2)).toBeLessThan(2)
+  expect(button.y).toBeGreaterThan(logo.y + logo.height)
+  for (const element of [logo, button]) {
+    expect(Math.abs(element.x + element.width / 2 - viewport.width / 2)).toBeLessThan(2)
+  }
+  await expect(start).toBeInViewport({ ratio: 1 })
+  if (isMobile) await start.tap()
+  else await start.click()
+
+  await expect(startScreen).toHaveCount(0)
+  await expect(header).toBeVisible()
+  await expect(field.locator('.pitch-markings')).toBeVisible()
   await expect(title).toBeVisible()
   await expect(date).toBeVisible()
   const titlePosition = (await title.boundingBox())!
   const datePosition = (await date.boundingBox())!
   expect(datePosition.x).toBeGreaterThan(titlePosition.x + titlePosition.width)
   expect(Math.abs(datePosition.y - titlePosition.y)).toBeLessThan(2)
-  await expect(page.getByRole('heading', { name: 'Inter', exact: true })).toBeVisible()
-  await expect(page.getByText('4-3-1-2', { exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: /^Maglia / })).toHaveCount(11)
+  await expect(team).toBeVisible()
+  await expect(formation).toBeVisible()
+  await expect(shirts).toHaveCount(11)
   await expect(page.locator('.scorer-icon')).toHaveCount(4)
   for (const number of [5, 8, 13, 22]) {
     const scorer = page.getByRole('button', { name: new RegExp(`^Maglia ${number},`) })
@@ -24,11 +65,11 @@ test('il derby mostra undici maglie e permette di aprire la numero 9', async ({ 
   }
   await expect(page.locator('.player-attempts')).toHaveCount(0)
 
-  const field = page.locator('.pitch')
   const panel = page.getByRole('region', { name: 'Tentativi', exact: true })
   const input = panel.getByRole('textbox', { name: 'Il tuo tentativo' })
   await expect(panel.locator('form:first-child > input:first-child')).toBeVisible()
   await expect(input).toBeDisabled()
+  await expect(panel.getByRole('button', { name: 'Termina', exact: true })).toBeVisible()
   const fieldSize = (await field.boundingBox())!
   const { width, height } = fieldSize
   expect(await panel.boundingBox()).toMatchObject({ width, height })
@@ -47,10 +88,15 @@ test('il derby mostra undici maglie e permette di aprire la numero 9', async ({ 
   expect(await panel.boundingBox()).toMatchObject({ width, height })
   expect(await panel.evaluate(element => element.scrollHeight <= element.clientHeight)).toBe(true)
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+
+  await page.reload()
+  await expect(start).toBeVisible()
+  await expect(title).toHaveCount(0)
+  await expect(field).toHaveCount(0)
 })
 
 test('si corregge una riga prima di inviarla e le O duplicate ricevono il feedback Wordle', async ({ page }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   await page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true }).click()
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
   const submit = page.getByRole('button', { name: 'Invia', exact: true })
@@ -84,8 +130,13 @@ test('si corregge una riga prima di inviarla e le O duplicate ricevono il feedba
 
 test('si sceglie con la tastiera e ETOO chiude la maglia come indovinata', async ({ page }) => {
   await page.goto(demoUrl)
+  const start = page.getByRole('button', { name: 'Inizia', exact: true })
   await page.keyboard.press('Tab')
+  await expect(page.getByRole('link', { name: 'Missing XI, inizio' })).toBeFocused()
   await page.keyboard.press('Tab')
+  await expect(start).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('button', { name: 'Maglia 22, attaccante', exact: true })).toBeFocused()
   await page.keyboard.press('Tab')
   await expect(page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true })).toBeFocused()
   await page.keyboard.press('Enter')
@@ -112,7 +163,7 @@ test('si sceglie con la tastiera e ETOO chiude la maglia come indovinata', async
 
 for (const [lastGuess, outcome] of [['AAAA', 'Rivelato'], ['ETOO', 'Indovinato']]) {
   test(`al sesto tentativo ${lastGuess} mostra Eto’o come ${outcome} e blocca ulteriori invii`, async ({ page, isMobile }) => {
-    await page.goto(demoUrl)
+    await openDemo(page)
     await page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true }).click()
     const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
     const submit = page.getByRole('button', { name: 'Invia', exact: true })
@@ -146,7 +197,7 @@ for (const [lastGuess, outcome] of [['AAAA', 'Rivelato'], ['ETOO', 'Indovinato']
 }
 
 test('l’input accetta solo lettere e normalizza maiuscole, accenti e apostrofo', async ({ page }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   await page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true }).click()
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
   await input.fill('1234')
@@ -159,7 +210,7 @@ test('l’input accetta solo lettere e normalizza maiuscole, accenti e apostrofo
 })
 
 test('cambiare maglia conserva i tentativi e il feedback del titolare precedente', async ({ page, isMobile }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   const shirt22 = page.getByRole('button', { name: 'Maglia 22, attaccante', exact: true })
   const shirt13 = page.getByRole('button', { name: 'Maglia 13, difensore', exact: true })
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
@@ -213,12 +264,13 @@ async function playShirt(page: Page, number: number, guesses: string[]) {
 }
 
 test('ricaricare ripristina la maglia in corso, gli indizi e gli esiti delle altre maglie', async ({ page }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   await playShirt(page, 13, ['MAICON'])
   await playShirt(page, 6, Array<string>(6).fill('ZZZZZ'))
   await playShirt(page, 9, ['OTTO'])
   await page.reload()
 
+  await expect(page.getByRole('button', { name: 'Inizia', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Maglia 9, attaccante', exact: true })).toHaveAttribute('aria-pressed', 'true')
   const first = page.getByRole('group', { name: 'Tentativo 1', exact: true })
   for (const [index, label] of ['O: presente altrove', 'T: posizione corretta', 'T: assente', 'O: posizione corretta'].entries()) {
@@ -234,9 +286,10 @@ test('ricaricare ripristina la maglia in corso, gli indizi e gli esiti delle alt
 test('due browser allo stesso indirizzo ritrovano ciascuno i propri tentativi', async ({ browser, page }) => {
   const other = await browser.newPage()
   try {
-    await page.goto(demoUrl)
+    await openDemo(page)
     await playShirt(page, 9, ['OTTO'])
     await other.goto(page.url())
+    await other.getByRole('button', { name: 'Inizia', exact: true }).click()
     await expect(other.getByRole('textbox', { name: 'Il tuo tentativo' })).toBeDisabled()
     await playShirt(other, 9, ['ETOO'])
 
@@ -251,7 +304,7 @@ test('due browser allo stesso indirizzo ritrovano ciascuno i propri tentativi', 
 
 test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato porta al risultato', async ({ page, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 320, height: 640 })
-  await page.goto(demoUrl)
+  await openDemo(page)
   const input = page.getByRole('textbox', { name: 'Il tuo tentativo' })
   const submit = page.getByRole('button', { name: 'Invia', exact: true })
   const rows = page.getByRole('group', { name: /^Tentativo \d+$/ })
@@ -306,7 +359,7 @@ test('ogni maglia mostra la propria griglia e l’ultimo titolare indovinato por
 })
 
 test('annullare Termina conserva i tentativi e confermare salva il risultato con i quattro titolari rivelati', async ({ page, context, isMobile }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   const panel = page.getByRole('region', { name: 'Tentativi', exact: true })
   const input = panel.getByRole('textbox', { name: 'Il tuo tentativo' })
   const submit = panel.getByRole('button', { name: 'Invia', exact: true })
@@ -362,7 +415,7 @@ test('annullare Termina conserva i tentativi e confermare salva il risultato con
 })
 
 test('il sesto errore sull’ultima maglia conclude la sfida e il risultato resta dopo la ricarica', async ({ page }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   for (const { number, answer } of starters.slice(0, -1)) {
     await playShirt(page, number, [answer])
   }
@@ -390,9 +443,9 @@ test('il sesto errore sull’ultima maglia conclude la sfida e il risultato rest
 })
 
 test('una scheda già aperta mostra l’esito salvato della maglia o della sfida', async ({ context, page }) => {
-  await page.goto(demoUrl)
+  await openDemo(page)
   const other = await context.newPage()
-  await other.goto(demoUrl)
+  await openDemo(other)
   await playShirt(page, 9, ['ETOO'])
   await playShirt(other, 9, ['OTTO'])
   await expect(other.getByRole('button', { name: 'Maglia 9, Eto’o, Indovinato' })).toBeFocused()

@@ -5,7 +5,8 @@ import { evaluateGuess } from './wordle'
 
 const { match } = defineProps<{ match: StrikerMatch }>()
 const { game } = match
-const formation = match.lineups.find(team => team.team_id === game.away.team_id)!
+const quizTeam = game[match.quiz_side ?? 'away']
+const formation = match.lineups.find(team => team.team_id === quizTeam.team_id)!
 const isDemo = game.game_id === 'demo'
 const paletteTeamId = formation.team_id === 'inter' ? '110' : formation.team_id
 const palette = teamColors.get(paletteTeamId)
@@ -19,8 +20,8 @@ const shirtColors = {
 const dateLabel = new Intl.DateTimeFormat('it-IT', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(game.date))
 const maxAttempts = 6
 const progressKey = isDemo
-  ? `missing-xi:${game.date}:${game.away.name}:v1`
-  : `missing-xi:strikerapi:${game.game_id}:${game.away.team_id}:v1`
+  ? `missing-xi:${game.date}:${quizTeam.name}:v1`
+  : `missing-xi:strikerapi:${game.game_id}:${quizTeam.team_id}:v1`
 const endedEarly = ref(false)
 const starters = orderStarters(formation.starting_xi)
 let offset = 0
@@ -52,12 +53,17 @@ type Shirt = (typeof lineup)[number]['players'][number]
 
 const shirts = lineup.flatMap(line => line.players)
 const remaining = computed(() => shirts.filter(shirt => !shirt.outcome).length)
-const finished = computed(() => remaining.value === 0)
 const guessedCount = computed(() => shirts.filter(shirt => shirt.outcome === 'Indovinato').length)
 const totalAttempts = computed(() => shirts.reduce((total, shirt) => total + shirt.attempts.length, 0))
 
 let lastSnapshot: string | null = null
 const selected = ref<Shirt | null>(restoreProgress() ?? null)
+const started = ref(lastSnapshot !== null)
+const phase = computed(() => {
+  if (!started.value) return 'ready'
+  return remaining.value === 0 ? 'finished' : 'playing'
+})
+const finished = computed(() => phase.value === 'finished')
 const guessInput = useTemplateRef<HTMLInputElement>('guessInput')
 const pitch = useTemplateRef<HTMLDivElement>('pitch')
 const finishDialog = useTemplateRef<HTMLDialogElement>('finishDialog')
@@ -169,8 +175,15 @@ function editGuess(event: Event) {
 async function focusGame() {
   await nextTick()
   if (finished.value) scoreHeading.value?.focus()
-  else if (selected.value?.outcome) pitch.value?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus()
+  else if (!selected.value) pitch.value?.querySelector<HTMLButtonElement>('button.player')?.focus()
+  else if (selected.value.outcome) pitch.value?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]')?.focus()
   else guessInput.value?.focus()
+}
+
+function startGame() {
+  selected.value = restoreProgress() ?? null
+  started.value = true
+  return focusGame()
 }
 
 function submitGuess() {
@@ -207,7 +220,8 @@ function finishEarly() {
 </script>
 
 <template>
-  <section class="match" aria-labelledby="match-title">
+  <slot v-if="phase !== 'ready'" name="calendar" />
+  <section v-if="phase !== 'ready'" class="match" aria-labelledby="match-title">
     <p class="eyebrow">{{ isDemo ? 'Serie A · Il derby di Milano' : 'Serie A' }}</p>
     <div class="match-heading">
       <h1 id="match-title">{{ game.home.name }} <strong>{{ game.home.score }}–{{ game.away.score }}</strong> {{ game.away.name }}</h1>
@@ -216,14 +230,18 @@ function finishEarly() {
     <p v-if="isDemo">Una notte da ricordare. Ma ricordi chi era in campo?</p>
   </section>
 
-  <div class="game-layout" :class="{ finished }">
+  <section v-if="phase === 'ready'" class="start-screen" aria-label="Avvio della sfida">
+    <h1 class="wordmark start-logo">MISSING <b>XI</b></h1>
+    <button type="button" class="submit" @click="startGame">Inizia</button>
+  </section>
+  <div v-else class="game-layout" :class="{ finished }">
     <section class="formation" aria-labelledby="formation-title">
       <div v-if="finished" class="challenge-result">
         <h2 ref="scoreHeading" tabindex="-1" aria-describedby="challenge-score">Sfida conclusa</h2>
         <p id="challenge-score">{{ guessedCount }} su {{ shirts.length }} indovinati · {{ attemptLabel(totalAttempts) }}</p>
       </div>
       <div class="section-heading">
-        <h2 id="formation-title">{{ game.away.name }}</h2>
+        <h2 id="formation-title">{{ quizTeam.name }}</h2>
         <span>{{ formation.formation }}</span>
       </div>
       <div ref="pitch" class="pitch" :style="shirtColors">
@@ -261,7 +279,7 @@ function finishEarly() {
       </div>
     </section>
 
-    <section v-if="!finished" id="guess-panel" class="guess-panel" aria-label="Tentativi">
+    <section v-if="phase === 'playing'" id="guess-panel" class="guess-panel" aria-label="Tentativi">
       <form @submit.prevent="submitGuess">
         <input id="guess" ref="guessInput" :value="selected?.draft ?? ''" :disabled="!selected || Boolean(selected.outcome)" type="text" inputmode="text" enterkeyhint="send" autocomplete="off" autocapitalize="characters" :spellcheck="false" aria-label="Il tuo tentativo" @input="editGuess" />
         <button v-if="selected" class="submit" :disabled="!canSubmit">Invia</button>
@@ -289,7 +307,7 @@ function finishEarly() {
       <button type="button" class="secondary conclude" aria-haspopup="dialog" @click="openFinishDialog">Termina</button>
     </section>
   </div>
-  <dialog v-if="!finished" ref="finishDialog" class="finish-dialog" aria-labelledby="finish-title">
+  <dialog v-if="phase === 'playing'" ref="finishDialog" class="finish-dialog" aria-labelledby="finish-title">
     <h2 id="finish-title">{{ remaining === 1 ? 'Vuoi rivelare 1 titolare rimasto?' : `Vuoi rivelare i ${remaining} titolari rimasti?` }}</h2>
     <form method="dialog">
       <button class="secondary" autofocus>Continua a giocare</button>

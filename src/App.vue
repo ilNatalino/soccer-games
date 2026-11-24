@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import ChallengeCalendar from './ChallengeCalendar.vue'
 import Game from './Game.vue'
 import { derby } from './derby'
 import schedule from './calendar.json'
@@ -11,9 +12,6 @@ const romeDate = new Intl.DateTimeFormat('en-GB', {
   timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
 })
 const romeOffset = new Intl.DateTimeFormat('en-GB', { timeZone, timeZoneName: 'longOffset' })
-const dayLabel = new Intl.DateTimeFormat('it-IT', {
-  timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short',
-})
 const queries = new URLSearchParams(window.location.search)
 const isDemo = queries.get('partita') === 'demo'
 const requestedDate = queries.get('giorno')
@@ -73,18 +71,14 @@ onUnmounted(() => {
   </header>
 
   <main>
-    <nav v-if="!isDemo" class="challenge-picker" aria-label="Calendario delle sfide">
-      <a
-        v-for="date in days"
-        :key="date"
-        :href="date === today ? '/' : `?giorno=${date}`"
-        :aria-current="date === selectedDate ? 'page' : undefined"
-      >
-        <time :datetime="date">{{ date === today ? 'Oggi' : dayLabel.format(new Date(date)) }}</time>
-      </a>
-    </nav>
-
-    <Game v-if="match" :key="selectedDate" :match="match" />
-    <h1 v-else class="challenge-unavailable">Sfida non disponibile</h1>
+    <Game v-if="match" :key="selectedDate" :match="match">
+      <template #calendar>
+        <ChallengeCalendar v-if="!isDemo" :days="days" :today="today" :selected-date="selectedDate" />
+      </template>
+    </Game>
+    <template v-else>
+      <ChallengeCalendar :days="days" :today="today" :selected-date="selectedDate" />
+      <h1 class="challenge-unavailable">Sfida non disponibile</h1>
+    </template>
   </main>
 </template>

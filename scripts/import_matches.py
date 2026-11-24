@@ -8,8 +8,9 @@ import unicodedata
 from collections import deque
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from random import Random
+from random import Random, choice
 from tempfile import NamedTemporaryFile
+from time import sleep
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -38,6 +39,10 @@ def request_data(tool, key, **params):
         except HTTPError as error:
             if tool == 'get_lineups' and error.code == 404:
                 raise ValueError('formazione non disponibile') from None
+            if tool == 'search_players' and error.code == 429 and attempt + 1 < attempts:
+                retry_after = (error.headers or {}).get('Retry-After', '')
+                sleep(int(retry_after) if retry_after.isdecimal() else 60)
+                continue
             raise RuntimeError(f'StrikerAPI: HTTP {error.code} per {tool}.') from None
         except (URLError, TimeoutError, socket.timeout) as error:
             reason = error.reason if isinstance(error, URLError) else error
@@ -54,8 +59,7 @@ def request_data(tool, key, **params):
             raise RuntimeError(f'StrikerAPI: {tool}: {detail}') from None
 
 
-def validate_match(match, game_id, day, score):
-    game = match['game']
+def validate_game(game, game_id, day, score):
     if game['game_id'] != game_id or game['date'] != day:
         raise ValueError('partita diversa da quella richiesta')
     if (game['home']['score'], game['away']['score']) != score:
@@ -63,10 +67,11 @@ def validate_match(match, game_id, day, score):
     if not all(isinstance(game[side]['name'], str) and game[side]['name'].strip() for side in ('home', 'away')):
         raise ValueError('nome della squadra mancante')
 
-    lineup = next((team for team in match['lineups'] if team['team_id'] == game['away']['team_id']), {})
+
+def validate_lineup(lineup, game_id, side):
     starters = lineup.get('starting_xi', [])
     if len(starters) != 11 or len({player['player_id'] for player in starters}) != 11:
-        raise ValueError('attesi undici titolari distinti per la squadra ospite')
+        raise ValueError('attesi undici titolari distinti')
     formation = lineup.get('formation') or ''
     if not re.fullmatch(r'[1-5](?:-[1-5])+', formation) or sum(map(int, formation.split('-'))) != 10:
         raise ValueError('modulo mancante o non valido')
@@ -87,7 +92,7 @@ def validate_match(match, game_id, day, score):
             raise ValueError('dato sui gol mancante o non valido')
         jerseys.add(int(jersey))
 
-    if game_id == '278524':
+    if game_id == '278524' and side == 'away':
         scorers = {int(player['jersey']) for player in starters if player['goals'] > 0}
         if scorers != {5, 8, 13, 22}:
             raise ValueError('marcatori del derby discordanti con il referto')
@@ -115,14 +120,31 @@ def fetch_calendar_match(key, game_id, fixture=None):
     if any(type(goals) is not int or goals < 0 for goals in score):
         raise ValueError('risultato mancante o non valido')
     date.fromisoformat(expected['date'])
-    validate_match(match, game_id, expected['date'], score)
+    validate_game(game, game_id, expected['date'], score)
+
+    lineups = {team.get('team_id'): team for team in match.get('lineups') or []}
+    valid_lineups = {}
+    errors = []
+    for side in ('home', 'away'):
+        team = game[side]
+        lineup = lineups.get(team['team_id'], {})
+        try:
+            validate_lineup(lineup, game_id, side)
+        except (KeyError, TypeError, ValueError) as error:
+            errors.append(f'{team["name"]}: {error}')
+        else:
+            valid_lineups[side] = lineup
+    if not valid_lineups:
+        raise ValueError(f'nessuna formazione valida ({", ".join(errors)})')
 
     teams = {side: {field: game[side][field] for field in ('team_id', 'name', 'score')}
              for side in ('home', 'away')}
-    lineup = next(team for team in match['lineups'] if team['team_id'] == teams['away']['team_id'])
+    quiz_side = choice(tuple(valid_lineups))
+    lineup = valid_lineups[quiz_side]
     player_fields = ('player_id', 'name', 'jersey', 'position', 'formation_place', 'goals')
     return {'data': {
         'game': {'game_id': game_id, 'date': game['date'], **teams},
+        'quiz_side': quiz_side,
         'lineups': [{
             'team_id': lineup['team_id'],
             'formation': lineup['formation'],
@@ -130,6 +152,18 @@ def fetch_calendar_match(key, game_id, fixture=None):
                             for player in lineup['starting_xi']],
         }],
     }}
+
+
+def fetch_short_name(key, player):
+    try:
+        profiles = json.loads(request_data('search_players', key, name=player['name'], limit=15))['data']['players']
+        profile = next((item for item in profiles if str(item['player_id']) == str(player['player_id'])), {})
+        short_name = profile.get('short_name')
+        if isinstance(short_name, str):
+            return short_name.strip() or None
+    except (ValueError, KeyError, TypeError, RuntimeError) as error:
+        print(f'Nome breve non recuperato per {player["name"]}: {error}')
+    return None
 
 
 def season_games(key, season):
@@ -158,8 +192,20 @@ def calendar_candidates(key, today):
 
 def fill_calendar(key, today):
     calendar = json.loads(CALENDAR.read_bytes())
-    available = {json.loads(path.read_bytes())['data']['game']['game_id']
-                 for path in OUTPUT.glob('*.json')}
+    available = set()
+    short_names = {}
+    for path in OUTPUT.glob('*.json'):
+        match = json.loads(path.read_bytes())['data']
+        game = match['game']
+        available.add(game['game_id'])
+        quiz_team_id = game[match.get('quiz_side', 'away')]['team_id']
+        for lineup in match.get('lineups') or []:
+            if lineup['team_id'] != quiz_team_id:
+                continue
+            for player in lineup.get('starting_xi') or []:
+                short_name = player.get('short_name')
+                if isinstance(short_name, str) and short_name.strip():
+                    short_names[str(player['player_id'])] = short_name.strip()
     days = [(today + timedelta(days=offset)).isoformat() for offset in range(-7, 9)]
     missing_days = deque(day for day in days if day not in calendar)
     missing_ids = {calendar[day] for day in days if day in calendar} - available
@@ -188,6 +234,11 @@ def fill_calendar(key, today):
     if missing_days:
         raise ValueError(f'partite valide insufficienti per {", ".join(missing_days)}')
     for game_id, match in matches.items():
+        for player in match['data']['lineups'][0]['starting_xi']:
+            player_id = str(player['player_id'])
+            if player_id not in short_names:
+                short_names[player_id] = fetch_short_name(key, player)
+            player['short_name'] = short_names[player_id]
         path = OUTPUT / f'game-{quote(game_id, safe="")}.json'
         save_response(path, json.dumps(match, ensure_ascii=False).encode())
     if new_dates:

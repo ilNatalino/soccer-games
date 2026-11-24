@@ -21,6 +21,7 @@ test('applica i colori personalizzati e distingue la maglia del portiere', async
   for (const [id, palette] of Object.entries(palettes)) {
     teamId = id
     await page.goto('/?partita=demo')
+    await page.getByRole('button', { name: 'Inizia', exact: true }).click()
     const shirt = page.getByRole('button', { name: /^Maglia 9,/ }).locator('.shirt')
     await expect(shirt).toHaveCSS('background-color', rgb(palette.color))
     await expect(shirt).toHaveCSS('color', rgb(palette.text_color))
