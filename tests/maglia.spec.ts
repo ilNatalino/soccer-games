@@ -7,7 +7,7 @@ async function openDemo(page: Page) {
   await page.getByRole('button', { name: 'Inizia', exact: true }).click()
 }
 
-test('il derby mostra logo e Inizia al centro e fa apparire il campo all’avvio', async ({ page, isMobile }) => {
+test('il derby mostra il riepilogo prima di Inizia e fa apparire il campo all’avvio', async ({ page, isMobile }) => {
   if (isMobile) await page.setViewportSize({ width: 320, height: 640 })
   await page.goto(demoUrl)
   const title = page.getByRole('heading', { name: 'Milan 0–4 Inter', exact: true })
@@ -15,8 +15,9 @@ test('il derby mostra logo e Inizia al centro e fa apparire il campo all’avvio
   const team = page.getByRole('heading', { name: 'Inter', exact: true })
   const formation = page.getByText('4-3-1-2', { exact: true })
   await expect(page).toHaveTitle('Missing XI')
-  await expect(title).toHaveCount(0)
-  await expect(date).toHaveCount(0)
+  await expect(title).toBeVisible()
+  await expect(date).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Calendario delle sfide' })).toHaveCount(0)
   await expect(team).toHaveCount(0)
   await expect(formation).toHaveCount(0)
 
@@ -31,15 +32,18 @@ test('il derby mostra logo e Inizia al centro e fa apparire il campo all’avvio
   await expect(page.getByRole('button', { name: 'Termina', exact: true })).toHaveCount(0)
   await expect(startScreen).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(startScreen).toHaveCSS('border-top-width', '0px')
-  const viewport = page.viewportSize()!
-  const { y, height: headerHeight } = (await header.boundingBox())!
+  const match = (await page.locator('.match').boundingBox())!
+  const titlePosition = (await title.boundingBox())!
+  const datePosition = (await date.boundingBox())!
+  expect((titlePosition.x + datePosition.x + datePosition.width) / 2).toBeCloseTo(match.x + match.width / 2, 1)
   const group = (await startScreen.boundingBox())!
-  const logo = (await startScreen.getByRole('heading', { name: 'MISSING XI', exact: true }).boundingBox())!
+  const logo = (await startScreen.getByText('MISSING XI', { exact: true }).boundingBox())!
   const button = (await start.boundingBox())!
-  expect(Math.abs(group.y + group.height / 2 - (y + headerHeight + viewport.height) / 2)).toBeLessThan(2)
+  expect(group.y).toBeGreaterThanOrEqual(match.y + match.height)
+  expect((logo.y + button.y + button.height) / 2).toBeCloseTo(group.y + group.height / 2)
   expect(button.y).toBeGreaterThan(logo.y + logo.height)
   for (const element of [logo, button]) {
-    expect(Math.abs(element.x + element.width / 2 - viewport.width / 2)).toBeLessThan(2)
+    expect(element.x + element.width / 2).toBeCloseTo(group.x + group.width / 2)
   }
   await expect(start).toBeInViewport({ ratio: 1 })
   if (isMobile) await start.tap()
@@ -50,8 +54,8 @@ test('il derby mostra logo e Inizia al centro e fa apparire il campo all’avvio
   await expect(field.locator('.pitch-markings')).toBeVisible()
   await expect(title).toBeVisible()
   await expect(date).toBeVisible()
-  const titlePosition = (await title.boundingBox())!
-  const datePosition = (await date.boundingBox())!
+  expect(await title.boundingBox()).toEqual(titlePosition)
+  expect(await date.boundingBox()).toEqual(datePosition)
   expect(datePosition.x).toBeGreaterThan(titlePosition.x + titlePosition.width)
   expect(Math.abs(datePosition.y - titlePosition.y)).toBeLessThan(2)
   await expect(team).toBeVisible()
@@ -91,7 +95,7 @@ test('il derby mostra logo e Inizia al centro e fa apparire il campo all’avvio
 
   await page.reload()
   await expect(start).toBeVisible()
-  await expect(title).toHaveCount(0)
+  await expect(title).toBeVisible()
   await expect(field).toHaveCount(0)
 })
 

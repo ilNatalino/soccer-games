@@ -273,8 +273,8 @@ function finishEarly() {
 </script>
 
 <template>
-  <slot v-if="phase !== 'ready'" name="calendar" />
-  <section v-if="phase !== 'ready'" class="match" aria-labelledby="match-title">
+  <slot name="calendar" />
+  <section class="match" aria-labelledby="match-title">
     <p class="eyebrow">{{ isDemo ? 'Serie A · Il derby di Milano' : 'Serie A' }}</p>
     <div class="match-heading">
       <h1 id="match-title">{{ game.home.name }} <strong>{{ game.home.score }}–{{ game.away.score }}</strong> {{ game.away.name }}</h1>
@@ -284,7 +284,7 @@ function finishEarly() {
   </section>
 
   <section v-if="phase === 'ready'" class="start-screen" aria-label="Avvio della sfida">
-    <h1 class="wordmark start-logo">MISSING <b>XI</b></h1>
+    <p class="wordmark start-logo" aria-hidden="true">MISSING <b>XI</b></p>
     <button type="button" class="submit" @click="startGame">Inizia</button>
   </section>
   <div v-else class="game-layout" :class="{ finished }">

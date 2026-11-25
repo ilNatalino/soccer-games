@@ -22,6 +22,7 @@
                     {
                         "player_id": "240055",
                         "name": "Michele Di Gregorio",
+                        "short_name": "Di Gregorio",
                         "jersey": "29",
                         "position": "Goalkeeper",
                         "formation_place": 1,
@@ -30,6 +31,7 @@
                     {
                         "player_id": "76017",
                         "name": "Nico González",
+                        "short_name": "González",
                         "jersey": "11",
                         "position": "Right Midfielder",
                         "formation_place": 2,
@@ -38,6 +40,7 @@
                     {
                         "player_id": "308029",
                         "name": "Andrea Cambiaso",
+                        "short_name": "Cambiaso",
                         "jersey": "27",
                         "position": "Left Midfielder",
                         "formation_place": 3,
@@ -46,6 +49,7 @@
                     {
                         "player_id": "243787",
                         "name": "Lloyd Kelly",
+                        "short_name": "Kelly",
                         "jersey": "6",
                         "position": "Center Left Defender",
                         "formation_place": 4,
@@ -54,6 +58,7 @@
                     {
                         "player_id": "388024",
                         "name": "Nicolò Savona",
+                        "short_name": "Savona",
                         "jersey": "37",
                         "position": "Center Defender",
                         "formation_place": 5,
@@ -62,6 +67,7 @@
                     {
                         "player_id": "346111",
                         "name": "Alberto Costa",
+                        "short_name": "Costa",
                         "jersey": "2",
                         "position": "Center Right Defender",
                         "formation_place": 6,
@@ -70,6 +76,7 @@
                     {
                         "player_id": "217538",
                         "name": "Manuel Locatelli",
+                        "short_name": "Locatelli",
                         "jersey": "5",
                         "position": "Center Right Midfielder",
                         "formation_place": 7,
@@ -78,6 +85,7 @@
                     {
                         "player_id": "283139",
                         "name": "Khéphren Thuram",
+                        "short_name": "Thuram",
                         "jersey": "19",
                         "position": "Center Left Midfielder",
                         "formation_place": 8,
@@ -86,6 +94,7 @@
                     {
                         "player_id": "252971",
                         "name": "Randal Kolo Muani",
+                        "short_name": "Kolo Muani",
                         "jersey": "20",
                         "position": "Forward",
                         "formation_place": 9,
@@ -94,6 +103,7 @@
                     {
                         "player_id": "312659",
                         "name": "Francisco Conceição",
+                        "short_name": "Conceição",
                         "jersey": "7",
                         "position": "Center Right Forward",
                         "formation_place": 10,
@@ -102,6 +112,7 @@
                     {
                         "player_id": "366509",
                         "name": "Kenan Yildiz",
+                        "short_name": "Yildiz",
                         "jersey": "10",
                         "position": "Center Left Forward",
                         "formation_place": 11,

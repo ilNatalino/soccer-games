@@ -4,6 +4,7 @@
   background: #f4f6f8;
   font-synthesis: none;
   line-height: 1.5;
+  scrollbar-gutter: stable;
 }
 
 * { box-sizing: border-box; }
@@ -27,12 +28,14 @@ a { color: inherit; }
 main { max-width: 1128px; margin: auto; padding: 36px 24px 20px; }
 h1, h2, p { margin: 0; }
 .eyebrow { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #53647a; }
+.match { text-align: center; }
 .match-heading {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   align-items: baseline;
   gap: 8px clamp(12px, 3vw, 32px);
-  margin: 8px 0;
+  margin-top: 8px;
   font-size: clamp(1.125rem, 5.5vw, 3rem);
   font-weight: 700;
   letter-spacing: -.045em;
@@ -118,8 +121,8 @@ button.player:hover { background: #ffffff18; }
 /* Leave room for six formation rows at the default text size. */
 .game-layout:not(.finished) :is(.pitch, .guess-panel) { height: 570px; overflow: auto; }
 #app:has(> main > .start-screen) { display: grid; grid-template-rows: auto 1fr; min-height: 100svh; }
-main:has(> .start-screen) { width: 100%; padding-block: 24px; }
-.start-screen { display: grid; justify-items: center; gap: 24px; }
+main:has(> .start-screen) { display: flex; flex-direction: column; width: 100%; margin-block: 0; }
+.start-screen { display: grid; flex: 1; align-content: center; justify-items: center; gap: 24px; padding-block: 24px; }
 .start-logo { font-size: clamp(2rem, 5vw, 3.75rem); line-height: 1; }
 .start-logo b { color: #234e9d; }
 .start-screen .submit { width: min(100%, 11rem); margin: 0; }
